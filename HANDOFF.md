@@ -116,6 +116,8 @@ even when every assertion passes. See `BUGS.md`.
 - `jev/.../CredentialStore.java` — key storage. Owner-only file, masked display, env override.
 - `docs/JEV.md` — the verified Jev contract. Read before writing any Jev code.
 - `docs/SCAFFOLDING.md` — what Baritone actually does when building off the ground, and the fix.
+- `docs/CONTAINERS.md` — the researched API for deposits and shulker overflow. Nothing implemented
+  yet; read it before starting `DEPOSIT_ITEM`.
 - `docs/DEPENDENCIES.md` — why each version is pinned, with sources.
 
 ## API integration

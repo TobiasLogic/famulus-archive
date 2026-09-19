@@ -12,6 +12,8 @@ iron farm without a rewrite, and that only holds if each layer is reliable befor
 - **Schematic material list.** `SchematicAnalyzer` parses through Baritone's registry;
   `MaterialList` diffs against inventory. 13 tests. Not yet reachable from any command or screen.
 - **In-game panel** with Agent, Build and Settings tabs, and in-game API key entry.
+- **Policy verified in a live client.** Jev consulted in game on a task that could not succeed.
+- **`EXPLORE` action** backed by Baritone's explore process, for when a resource is not nearby.
 - **Scaffolding measured.** Baritone builds off the ground but leaves its pillar; see
   `docs/SCAFFOLDING.md`.
 - **Jev client module.** `:jev` plus the `core` policy seam, 27 offline tests and a live smoke test

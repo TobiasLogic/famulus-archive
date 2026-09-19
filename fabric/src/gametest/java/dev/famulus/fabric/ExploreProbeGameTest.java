@@ -63,8 +63,10 @@ public final class ExploreProbeGameTest implements FabricClientGameTest {
             }
 
             // Treatment: explore, then try again.
+            // Exploring never finishes on its own; it runs until stopped. Bound it by time, which
+            // is exactly what FamulusAgent does with exploreTimeoutMillis.
             context.runOnClient(client -> EXPLORER.start(client));
-            context.waitFor(client -> !EXPLORER.isActive(), EXPLORE_TICKS);
+            context.waitTicks(EXPLORE_TICKS);
             context.runOnClient(client -> EXPLORER.cancel());
             context.waitTick();
             context.takeScreenshot("famulus-explore-after-exploring");
