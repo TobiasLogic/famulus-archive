@@ -9,13 +9,32 @@ about whether the mod works in Minecraft.
 GRADLE_USER_HOME=.cache/gradle ./gradlew :core:test
 ```
 
-**42 tests, all passing as of 2026-09-19.** `core` has no Minecraft or Baritone types, so the state
+**69 tests, all passing as of 2026-09-19**, across `:core` and `:jev`. `core` has no Minecraft or Baritone types, so the state
 machine runs against a fake executor and hand-written observations. Coverage includes existing
 inventory, progress, stalled and failed execution, retry exhaustion, the absolute task deadline,
 cancellation, cancellation *failure*, disconnect, death, dimension change, pickup grace after the
 executor goes inactive, and clock anomalies including a backwards clock and an overflowing jump.
 
-JUnit XML lands in `core/build/test-results/test/`.
+`:jev` tests run the real HTTP path against an embedded JDK `HttpServer`, so request construction
+and response parsing are covered without network access or spending anything. The canned bodies are
+copied from a genuine Jev reply recorded in `docs/JEV.md`.
+
+JUnit XML lands in `<module>/build/test-results/test/`.
+
+## 1b. Live Jev smoke test
+
+```bash
+OPENROUTER_API_KEY=... ./gradlew :jev:test --rerun-tasks
+```
+
+`JevLiveSmokeTest` calls the real API and is **skipped** unless that variable is set, so ordinary
+builds stay offline and deterministic. It exists because the offline tests only prove the client
+agrees with responses written by hand; if the live contract changes, only this test notices. A call
+costs about $0.000026.
+
+Last run 2026-09-19, both tests passed: Jev returned `DEPOSIT_ITEM` at confidence 0.98 for a state
+whose goal was met with a chest in reach, and `PolicyGate` accepted `GATHER` at 0.89 for a 31-of-32
+state. It asserts the contract rather than an exact answer, since the model is free to disagree.
 
 ## 2. Compilation against the real dependencies
 

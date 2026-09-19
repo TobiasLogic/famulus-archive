@@ -1,4 +1,8 @@
 plugins { id 'net.fabricmc.fabric-loom' version "${loom_version}" }
+// Gradle evaluates subprojects alphabetically, so :fabric would otherwise be configured before
+// :jev and could not read its source sets when bundling them into the mod jar.
+evaluationDependsOn(':core')
+evaluationDependsOn(':jev')
 base { archivesName = 'famulus-fabric-26.2' }
 java {
     sourceCompatibility = JavaVersion.VERSION_25
@@ -44,6 +48,7 @@ dependencies {
     implementation "net.fabricmc:fabric-loader:${loader_version}"
     implementation "net.fabricmc.fabric-api:fabric-api:${fabric_api_version}"
     implementation project(':core')
+    implementation project(':jev')
     implementation files(baritoneJar)
 }
 tasks.named('compileJava') { dependsOn 'verifyBaritone' }
@@ -53,7 +58,9 @@ processResources {
 }
 jar {
     from project(':core').sourceSets.main.output
+    from project(':jev').sourceSets.main.output
 }
 sourcesJar {
     from project(':core').sourceSets.main.allSource
+    from project(':jev').sourceSets.main.allSource
 }

@@ -6,5 +6,5 @@ allprojects {
     version = rootProject.property('version')
     repositories { mavenCentral() }
 }
-tasks.named('build') { dependsOn ':core:build', ':fabric:build' }
-tasks.named('check') { dependsOn ':core:check', ':fabric:check' }
+tasks.named('build') { dependsOn ':core:build', ':jev:build', ':fabric:build' }
+tasks.named('check') { dependsOn ':core:check', ':jev:check', ':fabric:check' }

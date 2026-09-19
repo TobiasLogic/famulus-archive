@@ -11,17 +11,17 @@ User goal
   -> back to Jev, escalating to the LLM when the plan looks invalid
 ```
 
-**Implementation status: only the bottom half exists.** The task engine and Baritone execution are
-built and verified in a real client. The LLM planner and the Jev policy are not written yet. Jev's
-API contract is verified and recorded in [JEV.md](JEV.md); the planner is still unassigned to a
-model. Do not read this document as a description of working software above the task engine line.
+**Implementation status.** The task engine and Baritone execution are built and verified in a real
+client. The Jev policy client is built and tested against the live API, but **nothing in the mod
+calls it yet**: no command consults it. The LLM planner is not written and its model is unassigned.
+Do not read this document as a description of working software above the task engine line.
 
 ## Layer responsibilities
 
 | Layer | Owns | Must not |
 | --- | --- | --- |
 | LLM planner | Research, deciding what an iron farm even is, generating a task graph, analysing repeated failures | Run in any loop; pick individual actions; be called when a cheaper layer suffices |
-| Jev policy | Choosing the next action from an explicitly enumerated set, reacting to observed state, flagging that replanning is needed | Invent actions; design farms; control movement keys |
+| Jev policy | Choosing the next action from an explicitly enumerated set, reacting to observed state, flagging that replanning is needed | Invent actions; design farms; control movement keys; be trusted without re-validation |
 | Task engine | Task ownership, retry and deadline bounds, what counts as done, cancellation | Know about Minecraft or Baritone types |
 | Baritone | Pathfinding, movement, mining, gathering, building | Define success |
 | Adapter | Observation, registry lookup, command registration, calling Baritone's public API | Contain decision logic |
@@ -39,8 +39,12 @@ what will let a 1.21.x adapter be added without touching control logic.
 `fabric` owns everything version-specific: observation, registry lookup, command registration and
 the Baritone adapter. It is the only module that imports Minecraft.
 
-Network clients for Jev and the LLM will be their own modules, kept out of both. Neither may be
-called from the tick loop.
+`jev` holds the Jev client. It depends on `core` for the policy types and imports no Minecraft. The
+LLM planner will get its own module on the same footing. Neither may be called from the tick loop.
+
+The policy seam mirrors the execution seam deliberately: `core` declares `PolicyClient` exactly as it
+declares `GatherExecutor`, and an outer module supplies the implementation. That is what keeps `core`
+testable without a game or a network.
 
 ## Why the network layers cannot be in the tick loop
 
@@ -81,6 +85,30 @@ The planned action set for Jev is `GATHER`, `MINE`, `CRAFT`, `TRAVEL`, `BUILD`, 
 `INTERACT`, `DEPOSIT_ITEM`, `WITHDRAW_ITEM`, `WAIT`, `VERIFY`, `RECOVER`, `COMPLETE_TASK`,
 `REQUEST_REPLAN`, `ABORT_TASK`. Only gather is executable today; the rest must be rejected rather
 than silently accepted until an executor exists for them.
+
+## Building from a supplied schematic
+
+Baritone 1.19.0 already provides the whole pipeline, confirmed by inspecting the pinned jar:
+
+| Need | API |
+| --- | --- |
+| Find a parser for a file | `BaritoneAPI.getProvider().getSchematicSystem().getByFile(File)` |
+| Which formats are registered | `ISchematicSystem.getFileExtensions()` |
+| Parse | `ISchematicFormat.parse(InputStream)` returning `IStaticSchematic` |
+| Read a block | `IStaticSchematic.getDirect(x, y, z)`, sized by `widthX/heightY/lengthZ` |
+| Build it | `IBuilderProcess.build(String name, File schematic, Vec3i origin)` |
+| Pause, resume, clear | `pause()`, `resume()`, `clearArea(BlockPos, BlockPos)` |
+| What it can place now | `IBuilderProcess.getApproxPlaceable()` |
+
+This makes the material list a **deterministic** computation: walk every position, count block
+states, diff against the inventory. No model is involved, and per the design principles none should
+be. A supplied blueprint is already a structured plan, so schematic building does not depend on the
+LLM planner existing; the planner is needed to *design* a farm, not to build a given one.
+
+Query `getFileExtensions()` at runtime and report what is supported rather than hardcoding a list.
+The jar also contains a `LitematicaHelper`, and `buildOpenSchematic()` / `buildOpenLitematic(int)`
+read a projection from the Litematica or Schematica mods when those are installed, which is a
+different path from reading a file directly.
 
 ## Rules that must not be undone
 

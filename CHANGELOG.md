@@ -2,6 +2,14 @@
 
 ## 0.1.0 — Unreleased
 
+- Added the policy seam in `core`: `AgentAction` (the full action set, each marked executable or
+  not), `PolicyRequest`, `PolicyDecision`, `PolicyClient` and `PolicyGate`, which turns confidence
+  into escalation and aborts after repeated escalation so a confused agent cannot loop forever.
+- Added the `:jev` module: `JevClient` calls the real decisions endpoint and re-validates the
+  returned choice against the offered options, because a network response is untrusted input.
+- 27 new offline tests plus a live smoke test that is skipped without an API key. Verified against
+  the real Jev API end to end.
+- **Not yet wired into gameplay.** No command consults the policy layer.
 - Identified **Jev** as `typesafe/jev-1.13`, a TypeSafe System One structured decision model, and
   verified its contract by direct API calls: `POST https://openrouter.ai/api/alpha/decisions`,
   median latency 0.78s, $0.000026 per call. Documented in `docs/JEV.md`. No integration code yet.

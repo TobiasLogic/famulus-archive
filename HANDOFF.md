@@ -21,11 +21,12 @@ multi-stage farms, then the iron farm. Do not skip ahead.
 attempt, declining to mine when the target was already satisfied, and cancelling cleanly on stop.
 Evidence including screenshots is committed in `docs/acceptance/2026-09-19/`.
 
-**Not written yet:** the Jev policy layer and the LLM planner. No chest deposit, crafting, building
-or farming. No task graph. Gathering covers only direct block drops listed in `GatherCatalog`.
+**Built and tested, but not yet wired into gameplay:** the Jev policy layer. `:jev` and the `core`
+policy seam have 27 offline tests and a live smoke test verified against the real API, but **no
+command consults them yet**. Nothing in Minecraft currently calls Jev.
 
-**Verified but unimplemented:** Jev's API contract. It was called successfully and its behavior
-measured; see `docs/JEV.md`. No code in this repository calls it yet.
+**Not written yet:** the LLM planner, the in-game screen and schematic support. No chest deposit, crafting, building
+or farming. No task graph. Gathering covers only direct block drops listed in `GatherCatalog`.
 
 **Do not claim these work:** every recovery path. Retry, stall timeout, task timeout, death,
 disconnect, dimension change and inventory-full are covered by 42 unit tests against a fake
@@ -33,7 +34,8 @@ executor, but have never run against real Baritone in a live client.
 
 ## Most recent work
 
-Found and verified Jev. It was absent from OpenRouter's public model catalog, which made it look
+Built the Jev client module and the policy seam in `core`, verified end to end against the live API.
+Before that: found and verified Jev. It was absent from OpenRouter's public model catalog, which made it look
 non-existent; it is real, and the contract is now documented. Before that: renamed the project from
 the working name BariModel to Famulus, added LGPL-3.0, and pushed to a private GitHub repository.
 
@@ -59,8 +61,10 @@ Xvfb, so the client test opens a real window for about four minutes.
 
 ```bash
 ./scripts/fetch-baritone.sh                            # pinned, checksum-verified dependency
-GRADLE_USER_HOME=.cache/gradle ./gradlew build         # compile + 42 unit tests
-GRADLE_USER_HOME=.cache/gradle ./gradlew :core:test    # engine tests only
+GRADLE_USER_HOME=.cache/gradle ./gradlew build         # compile + 69 unit tests
+GRADLE_USER_HOME=.cache/gradle ./gradlew :core:test    # engine + policy gate tests
+GRADLE_USER_HOME=.cache/gradle ./gradlew :jev:test     # Jev client tests, offline
+OPENROUTER_API_KEY=... ./gradlew :jev:test --rerun-tasks   # adds the live Jev smoke test
 ./scripts/run-client-gametest.sh                       # client acceptance, archives evidence
 ./scripts/run-client-gametest.sh --classify-only       # re-classify the last run, no relaunch
 ```
@@ -74,6 +78,13 @@ even when every assertion passes. See `BUGS.md`.
   Minecraft types, takes observations plus a monotonic clock. Everything important lives here.
 - `core/src/main/java/dev/famulus/core/` — `GatherTask` (validates its own fields), `TaskStatus`,
   `TaskResult`, `WorldSnapshot`, `GatherConfig`, `GatherExecutor` (the execution seam).
+- `core/.../AgentAction.java` — the full action set. Each constant records whether an executor
+  exists; only `GATHER`, `WAIT`, `VERIFY`, `RECOVER`, `COMPLETE_TASK`, `REQUEST_REPLAN` and
+  `ABORT_TASK` are executable today. Keep this honest as executors are added.
+- `core/.../PolicyGate.java` — turns confidence into escalation, and aborts after
+  `maxConsecutiveEscalations` so a confused agent cannot loop forever. Pure logic, 15 tests.
+- `jev/src/main/java/dev/famulus/jev/JevClient.java` — the only file that calls Jev. Re-validates
+  the returned choice against the offered options.
 - `core/src/test/java/dev/famulus/core/GatherControllerTest.java` — 42 tests, fake executor.
 - `fabric/src/main/java/dev/famulus/fabric/FamulusClient.java` — entrypoint, commands, tick loop.
 - `fabric/src/main/java/dev/famulus/fabric/BaritoneGatherExecutor.java` — the only file calling
@@ -120,17 +131,19 @@ exists anywhere in this repository and none may be added. `.gitignore` already e
 
 ## Next agent: do these in order
 
-1. **Write the Jev client** as its own module with no Minecraft imports, against `docs/JEV.md`.
-   Include a fake for tests. Validate the returned `choice` against the action enum before dispatch;
-   treat it as untrusted input.
-2. **Put it above the existing engine** for one real decision, not the whole action set. The natural
-   first one is the milestone 2 boundary: with logs gathered and a chest nearby, choose between
-   `DEPOSIT_ITEM` and `COMPLETE_TASK`. Keep the call off-thread; it must not touch the tick loop.
-3. **Implement `DEPOSIT_ITEM`** so milestone 2, "collect 32 oak logs and put them in a chest", can
-   pass a client acceptance phase like milestone 1 did.
-4. **Exercise a recovery path in a real client** so the retry and timeout logic stops being the most
-   valuable untested part of the system. Breaking Baritone's path mid-task is the cheapest way in.
-5. Only then consider the LLM planner and the milestone 3 platform build.
+1. **Schematic material list.** Parse a supplied file through Baritone's own schematic system, walk
+   it with `getDirect`, count block states and diff against the inventory. Deterministic; no model.
+   The exact API table is in `ARCHITECTURE.md`. Verify at runtime which extensions
+   `getFileExtensions()` actually reports rather than assuming `.litematic` is registered.
+2. **In-game screen.** A Fabric `Screen` on a keybind: schematics listed from a folder, the material
+   table, gather and build buttons, and a chat box. The user chose an in-game UI over a web UI.
+3. **Wire the policy layer in** for one real decision, not the whole action set. The natural first
+   one is the milestone 2 boundary: with logs gathered and a chest nearby, choose between
+   `DEPOSIT_ITEM` and `COMPLETE_TASK`. Run the call off-thread; it must not touch the tick loop.
+4. **Implement `DEPOSIT_ITEM`** so milestone 2 can pass a client acceptance phase like milestone 1.
+5. **LLM planner** behind the chat box, emitting typed tasks validated before dispatch.
+6. **Exercise a recovery path in a real client** so the retry and timeout logic stops being the most
+   valuable untested part of the system.
 
 ## Surprising things worth knowing
 
@@ -169,4 +182,29 @@ Jev calls plus three endpoint probes.
 absence from the OpenRouter catalog made it look nonexistent until the model URL was queried
 directly.
 
-**Next action:** item 1 above, the Jev client module.
+**Next action:** item 1 above, the schematic material list.
+
+### 2026-09-19, later
+
+**Attempted:** build the Jev policy layer, and establish whether Baritone can build from a supplied
+schematic.
+
+**Completed:** added `AgentAction`, `PolicyRequest`, `PolicyDecision`, `PolicyClient`,
+`PolicyException`, `PolicyGate` and `PolicyGateConfig` to `core`, and the `:jev` module with
+`JevClient` and `JevConfig`. 27 offline tests, including real HTTP round trips against an embedded
+JDK server. Added a live smoke test that skips without a key and verified it against the real API:
+Jev returned `DEPOSIT_ITEM` at confidence 0.98 for a met goal with a chest in reach, and the gate
+accepted `GATHER` at 0.89 for a 31-of-32 state. Confirmed from the pinned jar that Baritone provides
+a complete schematic pipeline, and recorded the API table in `ARCHITECTURE.md`.
+
+**Files modified:** `settings.gradle`, `build.gradle`, `fabric/build.gradle`, new `jev/` module,
+seven new `core` classes, two new test classes, and the documentation set.
+
+**Tests:** 69 offline tests pass, plus 2 live tests against the real Jev API. Full `build` green and
+the mod jar contains the `dev.famulus.jev` classes.
+
+**Problems:** Gradle evaluates subprojects alphabetically, so `:fabric` was configured before `:jev`
+and could not read its source sets; fixed with `evaluationDependsOn`. This is why `:core` worked and
+`:jev` did not, and it will bite again for any module sorted after `fabric`.
+
+**Next action:** the schematic material list, then the in-game screen.

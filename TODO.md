@@ -7,12 +7,18 @@ iron farm without a rewrite, and that only holds if each layer is reliable befor
 
 - **Milestone 1: collect 32 oak logs.** Verified in a real client, evidence in `docs/acceptance/`.
 - Jev identified, its API contract verified and measured, documented in `docs/JEV.md`.
+- **Jev client module.** `:jev` plus the `core` policy seam, 27 offline tests and a live smoke test
+  verified against the real API.
 
 ## Next
 
-1. **Jev client module.** No Minecraft imports, a fake for tests, and hard validation of the returned
-   choice against the action enum before dispatch. Build against `docs/JEV.md`.
-2. **One real Jev decision** above the existing engine, off-thread: at the milestone 2 boundary,
+1. **Schematic material list.** Parse a supplied `.litematic`/`.schem` through Baritone's own
+   schematic system, walk it with `getDirect`, and produce an exact block count diffed against the
+   inventory. Fully deterministic; no model involved. This is what makes "I don't have the
+   materials" answerable.
+2. **In-game screen.** A Fabric `Screen` on a keybind listing schematics from a folder, the material
+   table, gather and build buttons, and a chat box driving the planner.
+3. **One real Jev decision** above the existing engine, off-thread: at the milestone 2 boundary,
    choose between `DEPOSIT_ITEM` and `COMPLETE_TASK`. Not the whole action set at once.
 3. **Milestone 2: collect 32 oak logs and place them in a chest.** Needs `DEPOSIT_ITEM` and a client
    acceptance phase matching milestone 1's rigour.
