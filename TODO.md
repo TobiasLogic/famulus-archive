@@ -7,6 +7,8 @@ iron farm without a rewrite, and that only holds if each layer is reliable befor
 
 - **Milestone 1: collect 32 oak logs.** Verified in a real client, evidence in `docs/acceptance/`.
 - Jev identified, its API contract verified and measured, documented in `docs/JEV.md`.
+- **Agent loop.** `PlanRunner` plus `FamulusAgent`: multi-task plans, policy consulted off-thread on
+  failure, bounded retries. `/famulus queue`, `/famulus materials`, `/famulus collect`.
 - **Schematic material list.** `SchematicAnalyzer` parses through Baritone's registry;
   `MaterialList` diffs against inventory. 13 tests. Not yet reachable from any command or screen.
 - **Scaffolding measured.** Baritone builds off the ground but leaves its pillar; see

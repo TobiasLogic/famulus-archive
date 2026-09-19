@@ -2,6 +2,13 @@
 
 ## 0.1.0 — Unreleased
 
+- **The agent now chains tasks.** `PlanRunner` walks a `TaskPlan` and asks the policy layer when a
+  task fails; `FamulusAgent` drives it in-game and consults Jev off-thread on a daemon worker.
+- New commands: `/famulus queue <item>=<n>, ...` runs several gather tasks as one plan,
+  `/famulus materials <file>` reports a blueprint's shortfall, and `/famulus collect <file>` gathers
+  what a blueprint is missing.
+- Without `OPENROUTER_API_KEY` the agent still runs and simply retries failures deterministically,
+  so the policy layer is an improvement rather than a requirement.
 - Measured Baritone's behaviour when building off the ground, with a control and a treatment build.
   It succeeds, contrary to its reputation, but leaves its pillar behind. `docs/SCAFFOLDING.md`.
 - Added `MaterialList` and `MaterialRequirement` to `core`: a deterministic diff of what a blueprint

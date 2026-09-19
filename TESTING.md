@@ -9,7 +9,7 @@ about whether the mod works in Minecraft.
 GRADLE_USER_HOME=.cache/gradle ./gradlew :core:test
 ```
 
-**69 tests, all passing as of 2026-09-19**, across `:core` and `:jev`. `core` has no Minecraft or Baritone types, so the state
+**97 tests, all passing as of 2026-09-19**, across `:core` and `:jev`. `core` has no Minecraft or Baritone types, so the state
 machine runs against a fake executor and hand-written observations. Coverage includes existing
 inventory, progress, stalled and failed execution, retry exhaustion, the absolute task deadline,
 cancellation, cancellation *failure*, disconnect, death, dimension change, pickup grace after the
@@ -55,12 +55,24 @@ API drift and nothing else. A green build here has never meant the mod gathers a
 The only layer that demonstrates in-game behavior. It drives the real `/famulus` commands in a real
 client and checks the inventory, not Baritone's own reported state.
 
-**Recorded 2026-09-19: all assertions held.** Full procedure, evidence and host details are in
+**Recorded 2026-09-19: all 14 checks held**, including the multi-task plan phase. Full procedure, evidence and host details are in
 [docs/ACCEPTANCE.md](docs/ACCEPTANCE.md).
 
 Use the script, not `./gradlew :fabric:runClientGameTest`. The gradle task exits non-zero even on a
 completely successful run because of the Baritone shutdown defect in `BUGS.md`; the script separates
 that known teardown failure from a genuine one and fails on everything else.
+
+## What the client test now covers
+
+Four phases, all asserted against the inventory rather than against what Baritone reports:
+
+1. Gather to an observed total of 32, in one attempt.
+2. An already satisfied request that must not mine, verified against a sentinel log left standing.
+3. `/famulus stop` cancelling an in-progress task.
+4. **A two-task plan.** `/famulus queue minecraft:oak_log=8, minecraft:dirt=8` is sent once, and the
+   agent must reach the second task by itself. That unprompted advance is the autonomy claim, so it
+   is asserted directly: the log line `running gather 8 minecraft:dirt` only appears if the agent
+   decided to move on without being told.
 
 ## What is still unverified
 

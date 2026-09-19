@@ -2,10 +2,19 @@ package dev.famulus.fabric;
 
 import com.google.gson.Gson;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
+import com.mojang.brigadier.arguments.StringArgumentType;
 import dev.famulus.core.GatherController;
+import dev.famulus.core.MaterialList;
+import dev.famulus.core.MaterialRequirement;
+import dev.famulus.core.PlannedTask;
+import dev.famulus.core.PolicyGateConfig;
+import dev.famulus.core.TaskPlan;
 import dev.famulus.core.GatherTask;
 import dev.famulus.core.TaskResult;
 import dev.famulus.core.TaskStatus;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallback;
@@ -27,9 +36,11 @@ import static net.fabricmc.fabric.api.client.command.v2.ClientCommands.literal;
 public final class FamulusClient implements ClientModInitializer {
     public static final Logger LOGGER = LoggerFactory.getLogger("Famulus");
     private static final Gson JSON = new Gson();
-    private final MinecraftObserver observer = new MinecraftObserver();
+    public static final MinecraftObserver OBSERVER = new MinecraftObserver();
     private final BaritoneGatherExecutor executor = new BaritoneGatherExecutor();
     private GatherController controller;
+    private FamulusAgent agent;
+    private int agentTicks;
     private FamulusConfig config;
     private String configurationError;
     private TaskStatus lastStatus;
@@ -40,6 +51,7 @@ public final class FamulusClient implements ClientModInitializer {
         try {
             config = FamulusConfig.load(FabricLoader.getInstance().getConfigDir().resolve("famulus.properties"));
             controller = new GatherController(executor, config.gather());
+            agent = new FamulusAgent(config.gather(), PolicyGateConfig.defaults());
         } catch (Exception e) {
             configurationError = "Fix config/famulus.properties and restart: " + e.getMessage();
             LOGGER.error("Famulus configuration is invalid. {}", configurationError, e);
@@ -49,6 +61,20 @@ public final class FamulusClient implements ClientModInitializer {
                         .requires(FabricClientCommandSource::attended)
                         .executes(context -> status(context.getSource()))
                         .then(literal("status").executes(context -> status(context.getSource())))
+                        .then(literal("materials")
+                                .then(argument("schematic", StringArgumentType.string())
+                                        .suggests(FamulusClient::suggestSchematics)
+                                        .executes(context -> materials(context.getSource(),
+                                                StringArgumentType.getString(context, "schematic")))))
+                        .then(literal("queue")
+                                .then(argument("spec", StringArgumentType.greedyString())
+                                        .executes(context -> queue(context.getSource(),
+                                                StringArgumentType.getString(context, "spec")))))
+                        .then(literal("collect")
+                                .then(argument("schematic", StringArgumentType.string())
+                                        .suggests(FamulusClient::suggestSchematics)
+                                        .executes(context -> collect(context.getSource(),
+                                                StringArgumentType.getString(context, "schematic")))))
                         .then(literal("stop").executes(context -> stop(context.getSource())))
                         .then(literal("gather")
                                 .then(argument("item", IdentifierArgument.id())
@@ -64,7 +90,9 @@ public final class FamulusClient implements ClientModInitializer {
                                                         context.getArgument("item", Identifier.class),
                                                         IntegerArgumentType.getInteger(context, "count"))))))));
         ClientTickEvents.END_CLIENT_TICK.register(this::tick);
-        LOGGER.info("Famulus 0.1.0 initialized for Minecraft 26.2; deterministic gather only.");
+        LOGGER.info("Famulus 0.1.0 initialized for Minecraft 26.2. Policy {}. Schematic formats: {}",
+                agent != null && agent.isPolicyConfigured() ? "ready" : "offline",
+                String.join(", ", SchematicAnalyzer.supportedExtensions()));
     }
 
     private int gather(FabricClientCommandSource source, Identifier item, int count) {
@@ -82,7 +110,7 @@ public final class FamulusClient implements ClientModInitializer {
         try {
             if (executor.isBusy()) return error(source, "Baritone is already busy. Stop its current operation first.");
             GatherTask task = new GatherTask(UUID.randomUUID().toString(), item.toString(), item.toString(), count);
-            controller.start(task, observer.observe(client, task.itemId()), now());
+            controller.start(task, OBSERVER.observe(client, task.itemId()), now());
             lastStatus = controller.result().status();
             report(source, controller.result());
             LOGGER.info("task={} item={} result={}", task.id(), task.itemId(), JSON.toJson(controller.result()));
@@ -94,10 +122,18 @@ public final class FamulusClient implements ClientModInitializer {
     }
 
     private void tick(Minecraft client) {
+        if (agent != null && agent.isRunning() && ++agentTicks % config.observationIntervalTicks() == 0) {
+            try {
+                agent.tick(client, now());
+            } catch (RuntimeException e) {
+                agent.stop("Agent failure: " + e.getMessage());
+                LOGGER.error("Plan stopped after an integration failure", e);
+            }
+        }
         if (controller == null || !controller.isRunning()) return;
         if (++ticks % config.observationIntervalTicks() != 0) return;
         try {
-            controller.tick(observer.observe(client, controller.task().itemId()), now());
+            controller.tick(OBSERVER.observe(client, controller.task().itemId()), now());
             TaskResult result = controller.result();
             if (result.status() != lastStatus) {
                 lastStatus = result.status();
@@ -114,11 +150,171 @@ public final class FamulusClient implements ClientModInitializer {
     private int status(FabricClientCommandSource source) {
         if (!ready(source)) return 0;
         report(source, controller.result());
+        if (agent != null) {
+            source.sendFeedback(Component.literal("[Famulus] " + agent.status()));
+            List<String> recent = agent.recentLog();
+            recent.subList(Math.max(0, recent.size() - 5), recent.size())
+                    .forEach(line -> source.sendFeedback(Component.literal("  " + line)));
+        }
+        return 1;
+    }
+
+    private static java.util.concurrent.CompletableFuture<com.mojang.brigadier.suggestion.Suggestions>
+            suggestSchematics(com.mojang.brigadier.context.CommandContext<FabricClientCommandSource> context,
+                              com.mojang.brigadier.suggestion.SuggestionsBuilder builder) {
+        try {
+            SchematicAnalyzer.listSchematics().stream()
+                    .map(path -> path.getFileName().toString())
+                    .filter(name -> name.toLowerCase().startsWith(builder.getRemainingLowerCase().replace("\"", "")))
+                    .forEach(name -> builder.suggest('"' + name + '"'));
+        } catch (Exception ignored) {
+            // Suggestions are a convenience; a missing directory must not break the command.
+        }
+        return builder.buildFuture();
+    }
+
+    /** Parses a blueprint and reports what it needs against what is held. Changes nothing. */
+    private int materials(FabricClientCommandSource source, String schematic) {
+        if (!ready(source)) return 0;
+        Minecraft client = Minecraft.getInstance();
+        if (client.player == null) return error(source, "Join a world first.");
+        MaterialList list;
+        SchematicSummary summary;
+        try {
+            summary = SchematicAnalyzer.analyze(SchematicAnalyzer.schematicDirectory().resolve(schematic));
+            list = MaterialList.of(summary.itemCounts(),
+                    MinecraftObserver.countAll(client, summary.itemCounts().keySet()));
+        } catch (Exception failure) {
+            return error(source, failure.getMessage());
+        }
+        source.sendFeedback(Component.literal("[Famulus] " + summary.name() + " "
+                + summary.dimensions() + ", " + summary.totalBlocks() + " blocks, "
+                + list.distinctItems() + " item types"));
+        for (MaterialRequirement requirement : list.requirements()) {
+            source.sendFeedback(Component.literal(String.format("  %-34s need %5d  have %5d  short %5d",
+                    requirement.itemId(), requirement.needed(), requirement.have(), requirement.shortfall())));
+        }
+        List<MaterialRequirement> blocked = list.unobtainable(GatherCatalog::supports);
+        if (!blocked.isEmpty()) {
+            source.sendFeedback(Component.literal("[Famulus] cannot gather yet: "
+                    + blocked.stream().map(MaterialRequirement::itemId).toList()));
+        }
+        return 1;
+    }
+
+    /**
+     * Queues several gather tasks from a spec such as
+     * {@code minecraft:oak_log=32, minecraft:dirt=16}, and runs them as one plan.
+     *
+     * <p>Counts are inventory totals, matching {@code /famulus gather}. This is the schematic flow
+     * without needing a blueprint file, and it is what the plan gametest drives.
+     */
+    private int queue(FabricClientCommandSource source, String spec) {
+        if (!ready(source)) return 0;
+        Minecraft client = Minecraft.getInstance();
+        if (client.player == null || client.level == null) return error(source, "Join a world first.");
+        if (client.player.gameMode() != GameType.SURVIVAL) {
+            return error(source, "Gathering requires survival mode; creative mining does not drop items.");
+        }
+        if (agent.isRunning() || controller.isRunning()) {
+            return error(source, "Something is already running. Use /famulus stop first.");
+        }
+        List<PlannedTask> tasks = new ArrayList<>();
+        int number = 0;
+        for (String entry : spec.split(",")) {
+            String trimmed = entry.trim();
+            if (trimmed.isEmpty()) continue;
+            String[] parts = trimmed.split("=", 2);
+            if (parts.length != 2) {
+                return error(source, "Expected item=count entries, got: " + trimmed);
+            }
+            String itemId = parts[0].trim();
+            if (!GatherCatalog.supports(itemId)) {
+                return error(source, "Unsupported gather item: " + itemId
+                        + ". Supported: " + GatherCatalog.items());
+            }
+            int count;
+            try {
+                count = Integer.parseInt(parts[1].trim());
+            } catch (NumberFormatException notANumber) {
+                return error(source, "Not a number: " + parts[1].trim());
+            }
+            if (count < 1 || count > 2304) {
+                return error(source, "Count must be between 1 and 2304, got " + count);
+            }
+            tasks.add(new PlannedTask.Gather("t" + (++number), itemId, count));
+        }
+        if (tasks.isEmpty()) return error(source, "Nothing to gather.");
+        try {
+            agent.start(new TaskPlan("queued gather", tasks));
+        } catch (RuntimeException failure) {
+            return error(source, "Cannot start plan: " + failure.getMessage());
+        }
+        source.sendFeedback(Component.literal("[Famulus] plan started: " + tasks.size()
+                + " tasks." + (agent.isPolicyConfigured() ? "" : " Policy offline; failures will just retry.")));
+        return 1;
+    }
+
+    /** Builds a gather plan from a blueprint's shortfall and runs it autonomously. */
+    private int collect(FabricClientCommandSource source, String schematic) {
+        if (!ready(source)) return 0;
+        Minecraft client = Minecraft.getInstance();
+        if (client.player == null || client.level == null) return error(source, "Join a world first.");
+        if (client.player.gameMode() != GameType.SURVIVAL) {
+            return error(source, "Gathering requires survival mode; creative mining does not drop items.");
+        }
+        if (agent.isRunning() || controller.isRunning()) {
+            return error(source, "Something is already running. Use /famulus stop first.");
+        }
+        SchematicSummary summary;
+        MaterialList list;
+        try {
+            summary = SchematicAnalyzer.analyze(SchematicAnalyzer.schematicDirectory().resolve(schematic));
+            list = MaterialList.of(summary.itemCounts(),
+                    MinecraftObserver.countAll(client, summary.itemCounts().keySet()));
+        } catch (Exception failure) {
+            return error(source, failure.getMessage());
+        }
+        if (list.isSatisfied()) {
+            source.sendFeedback(Component.literal("[Famulus] every material for "
+                    + summary.name() + " is already held."));
+            return 1;
+        }
+        List<MaterialRequirement> blocked = list.unobtainable(GatherCatalog::supports);
+        if (!blocked.isEmpty()) {
+            return error(source, "No gather path for " + blocked.stream()
+                    .map(MaterialRequirement::itemId).toList()
+                    + ". Only logs, dirt, sand and red sand are supported so far.");
+        }
+        List<PlannedTask> tasks = new ArrayList<>();
+        int number = 0;
+        for (MaterialRequirement requirement : list.gatherable(GatherCatalog::supports)) {
+            if (requirement.needed() > 2304) {
+                return error(source, requirement.itemId() + " needs " + requirement.needed()
+                        + ", more than an inventory holds. Chest storage does not exist yet.");
+            }
+            tasks.add(new PlannedTask.Gather("t" + (++number), requirement.itemId(), requirement.needed()));
+        }
+        try {
+            TaskPlan plan = new TaskPlan("collect materials for " + summary.name(), tasks);
+            agent.start(plan);
+        } catch (RuntimeException failure) {
+            return error(source, "Cannot start plan: " + failure.getMessage());
+        }
+        source.sendFeedback(Component.literal("[Famulus] collecting for " + summary.name()
+                + ": " + tasks.size() + " gather tasks, " + list.totalShortfall() + " items short."
+                + (agent.isPolicyConfigured() ? "" : " Policy offline; failures will just retry.")));
         return 1;
     }
 
     private int stop(FabricClientCommandSource source) {
         if (!ready(source)) return 0;
+        if (agent != null && agent.isRunning()) {
+            agent.stop("Stopped by user");
+            report(source, controller.result());
+            source.sendFeedback(Component.literal("[Famulus] plan stopped: " + agent.status()));
+            return 1;
+        }
         controller.stop("Stopped by user");
         lastStatus = controller.result().status();
         report(source, controller.result());

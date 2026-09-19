@@ -40,8 +40,14 @@ require_line 'SUCCESS | 32/32 | attempts 0 | Inventory target already satisfied'
     'an already satisfied request completed without mining'
 require_line 'CANCELLED | 32/96 | attempts 1 | Stopped by user' \
     '/famulus stop cancelled an in-progress task'
+require_line '[agent] plan started: queued gather (2 tasks)' \
+    'a two-task plan started'
+require_line '[agent] running gather 8 minecraft:dirt' \
+    'the agent advanced to its second task unprompted'
+require_line 'plan PLAN_COMPLETE' \
+    'the plan ran to completion'
 
-for shot in gather-running gather-completed inventory-32-oak-logs already-satisfied stopped; do
+for shot in gather-running gather-completed inventory-32-oak-logs already-satisfied stopped plan-first-task plan-complete; do
     if compgen -G "$run_dir/screenshots/*${shot}.png" > /dev/null; then
         echo "  ok   screenshot ${shot}"
     else

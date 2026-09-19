@@ -21,9 +21,15 @@ multi-stage farms, then the iron farm. Do not skip ahead.
 attempt, declining to mine when the target was already satisfied, and cancelling cleanly on stop.
 Evidence including screenshots is committed in `docs/acceptance/2026-09-19/`.
 
-**Built and tested, but not yet wired into gameplay:** the Jev policy layer. `:jev` and the `core`
-policy seam have 27 offline tests and a live smoke test verified against the real API, but **no
-command consults them yet**. Nothing in Minecraft currently calls Jev.
+**The agent chains tasks unattended.** `/famulus queue minecraft:oak_log=8, minecraft:dirt=8` was
+sent once in a real client and the agent gathered the logs, then moved to dirt by itself, then
+reported `PLAN_COMPLETE`. That is asserted in the client test, not just observed.
+
+**Wired in:** the Jev policy layer. `:jev` and the `core`
+policy seam have 27 offline tests and a live smoke test verified against the real API.
+`FamulusAgent` consults it off-thread whenever a task fails. **The policy path has not yet been
+exercised in a live client**, because no task has failed during a client run; only the deterministic
+fallback has run in-game.
 
 **Built and tested, but not reachable from the game:** the schematic material list.
 `SchematicAnalyzer` parses a blueprint through Baritone's own registry and counts its items;
@@ -66,7 +72,7 @@ Xvfb, so the client test opens a real window for about four minutes.
 
 ```bash
 ./scripts/fetch-baritone.sh                            # pinned, checksum-verified dependency
-GRADLE_USER_HOME=.cache/gradle ./gradlew build         # compile + 69 unit tests
+GRADLE_USER_HOME=.cache/gradle ./gradlew build         # compile + 97 unit tests
 GRADLE_USER_HOME=.cache/gradle ./gradlew :core:test    # engine + policy gate tests
 GRADLE_USER_HOME=.cache/gradle ./gradlew :jev:test     # Jev client tests, offline
 OPENROUTER_API_KEY=... ./gradlew :jev:test --rerun-tasks   # adds the live Jev smoke test
@@ -243,3 +249,27 @@ passed in the same run as the probe.
 `docs/SCAFFOLDING.md` and must not be assumed to work.
 
 **Next action:** the in-game screen, which the user wants tabbed.
+
+### 2026-09-19, fourth session
+
+**Attempted:** make the agent actually autonomous by chaining tasks, rather than one gather per
+command.
+
+**Completed:** `PlannedTask`, `TaskPlan`, `PlanRunner` and `PlanStep` in `core`, with 15 tests.
+`PlanRunner` never calls the policy itself: it returns `CONSULT_POLICY` and the caller does the I/O,
+which keeps threading out of `core`. `FamulusAgent` drives it in-game on a daemon worker. Added
+`/famulus queue`, `/famulus materials` and `/famulus collect`. The client test gained a fourth phase
+asserting the agent advances between tasks unprompted; all 14 checks pass.
+
+**Files modified:** four new `core` classes plus tests, `FamulusAgent`, `FamulusClient`,
+`MinecraftObserver.countAll`, the gametest, the acceptance classifier, and the documentation set.
+
+**Tests:** 97 offline tests. Client acceptance run twice, 14/14 both times.
+
+**Problems:** found and fixed a bug in my own code before committing: a policy answer arriving after
+its request had timed out would have been applied to whatever situation came next. Answers now carry
+a generation tag and stale ones are discarded. The acceptance run was repeated after the fix so the
+tested artifact is the committed one.
+
+**Next action:** the tabbed in-game screen. `FamulusAgent.recentLog()` and `PlanRunner.progress()`
+already expose what the Agent tab needs.

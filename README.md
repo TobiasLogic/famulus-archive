@@ -22,7 +22,8 @@ deferred until the deterministic path is validated, and no endpoint has been inv
 | Layer | Role | Status |
 | --- | --- | --- |
 | LLM planner | Research, task graphs, failure analysis, replanning | Not written; model not chosen |
-| [Jev](docs/JEV.md) | Picks the next action from an explicitly defined set, flags when replanning is needed | Contract verified, no integration code yet |
+| [Jev](docs/JEV.md) | Picks the next action from an explicitly defined set, flags when replanning is needed | Wired in: consulted off-thread when a task fails |
+| Plan runner | Walks a plan task by task, asks the policy when one fails, bounds retries | Built, 15 unit tests |
 | Task engine | Task ownership, retry and deadline bounds, what counts as done | Built, 42 unit tests |
 | Baritone | Pathfinding, movement, mining, building | Working, verified in-client |
 
@@ -36,7 +37,10 @@ the full design and [docs/JEV.md](docs/JEV.md) for the measured API contract.
 | --- | --- |
 | `/famulus gather <item> <count>` | Hold at least `count` of `item`. Tab completion lists supported items. |
 | `/famulus status` | Current status, inventory progress and attempt count. |
-| `/famulus stop` | Cancel the running task and the Baritone work it started. |
+| `/famulus stop` | Cancel the running task or plan, and the Baritone work it started. |
+| `/famulus queue <item>=<n>, <item>=<n>` | Run several gather tasks as one plan, unattended. |
+| `/famulus materials <file>` | Parse a blueprint and show what it needs against what you hold. Changes nothing. |
+| `/famulus collect <file>` | Build a gather plan from a blueprint's shortfall and run it. |
 
 Requires survival mode and a supported item. Anything else is refused with a reason rather than
 half-attempted.
@@ -49,8 +53,12 @@ GRADLE_USER_HOME=.cache/gradle ./gradlew build               # compile and unit 
 ./scripts/run-client-gametest.sh                             # client acceptance
 ```
 
-Set `OPENROUTER_API_KEY` in your environment once the Jev or planner layers are wired in. No key is
-stored in this repository and none should be added.
+Set `OPENROUTER_API_KEY` in your environment to enable the policy layer. Without it the agent still
+runs, it simply retries failures deterministically instead of reconsidering them. No key is stored in
+this repository and none should be added.
+
+Blueprints go in `config/famulus/schematics/`. `/famulus materials` lists the formats this
+installation can actually parse, since that comes from Baritone's registry at runtime.
 
 Install the matching Baritone API Fabric jar alongside Famulus and Fabric API in the same
 instance. `docs/DEPENDENCIES.md` explains which Baritone distribution is correct and why.

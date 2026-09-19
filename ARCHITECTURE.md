@@ -55,6 +55,21 @@ validated decision back to the client thread at a task boundary.
 `GatherController` is already built for this. It has no I/O, takes `WorldSnapshot` plus a timestamp,
 and returns a `TaskResult`. A policy layer can sit above it without changing it.
 
+## The agent loop
+
+`PlanRunner` walks a `TaskPlan` one task at a time. It deliberately **does not call the policy
+itself**: when a task fails it returns `CONSULT_POLICY`, and the caller makes that call off-thread
+and hands the answer back through `onPolicyDecision`. That is what keeps a network call out of the
+tick loop without putting threading into `core`.
+
+`FamulusAgent` is the caller. It drives each gather task through `GatherController`, and on failure
+offers the policy four choices: retry, accept and move on, escalate to the planner, or abandon. Its
+worker threads are daemons on purpose, because Baritone's non-daemon pool is exactly why the client
+cannot exit cleanly (see `BUGS.md`) and one instance of that bug is enough.
+
+A plan containing a task with no executor is refused when the runner is constructed, rather than
+running half of it and stopping partway with the world in a changed state.
+
 ## Data flow, as built today
 
 1. `/famulus gather <item> <count>` parses and validates the request, rejecting unsupported items,

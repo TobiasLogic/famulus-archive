@@ -78,6 +78,30 @@ public final class GatherClientGameTest implements FabricClientGameTest {
             }
             command(context, "/famulus status");
             context.takeScreenshot("famulus-stopped");
+
+            // A multi-task plan, which is the whole point of the agent: it must move to the second
+            // task by itself once the first is satisfied, with no further command.
+            world.getServer().runCommand("clear @a");
+            world.getServer().runCommand("give @a minecraft:diamond_axe 1");
+            world.getServer().runCommand("give @a minecraft:diamond_shovel 1");
+            world.getServer().runCommand("fill 2 -60 2 9 -60 3 minecraft:oak_log");
+            context.waitTick();
+            world.getConnection().waitForClientboundPackets();
+            context.runOnClient(client -> require(oakCount(client) == 0 && dirtCount(client) == 0,
+                    "The plan fixture must start empty"));
+
+            command(context, "/famulus queue minecraft:oak_log=8, minecraft:dirt=8");
+            context.waitFor(client -> oakCount(client) >= 8, GATHER_TIMEOUT_TICKS);
+            context.takeScreenshot("famulus-plan-first-task");
+            // Nothing else is sent: reaching the second task is the agent's own doing.
+            context.waitFor(client -> dirtCount(client) >= 8, GATHER_TIMEOUT_TICKS);
+            context.waitFor(client -> !isMining(), 400);
+            context.runOnClient(client -> {
+                require(oakCount(client) >= 8, "The plan must keep the first task's items");
+                require(dirtCount(client) >= 8, "The plan must complete its second task");
+            });
+            command(context, "/famulus status");
+            context.takeScreenshot("famulus-plan-complete");
         }
     }
 
@@ -90,6 +114,10 @@ public final class GatherClientGameTest implements FabricClientGameTest {
 
     private static int oakCount(Minecraft client) {
         return client.player.getInventory().countItem(Items.OAK_LOG);
+    }
+
+    private static int dirtCount(Minecraft client) {
+        return client.player.getInventory().countItem(Items.DIRT);
     }
 
     private static boolean isMining() {

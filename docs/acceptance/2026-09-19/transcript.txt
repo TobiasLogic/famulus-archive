@@ -1,23 +1,39 @@
-[16:29:46] [Render thread/INFO] (Famulus) Famulus 0.1.0 initialized for Minecraft 26.2; deterministic gather only.
-[16:29:47] [Render thread/INFO] (Minecraft) [CHAT] [Baritone] Baritone settings file not found, resetting.
-[16:29:57] [Server thread/INFO] (Minecraft) Teleported Player0 to 0.500000, -60.000000, 0.500000
-[16:29:57] [Server thread/INFO] (Minecraft) No items were found on player Player0
-[16:29:57] [Server thread/INFO] (Minecraft) Gave 1 [Diamond Axe] to Player0
-[16:29:57] [Server thread/INFO] (Minecraft) Successfully filled 32 block(s)
-[16:29:57] [Render thread/INFO] (Minecraft) [System] [CHAT] [Famulus] RUNNING | 0/32 | attempts 1 | Starting gather attempt 1 of 3
-[16:29:57] [Render thread/INFO] (Famulus) task=33a9d010-d378-4b88-9f80-71f36a691000 item=minecraft:oak_log result={"status":"RUNNING","message":"Starting gather attempt 1 of 3","currentCount":0,"targetCount":32,"attempts":1}
-[16:30:22] [Render thread/INFO] (Minecraft) [CHAT] [Baritone] Have 32 valid items
-[16:30:22] [Render thread/INFO] (Minecraft) [System] [CHAT] [Famulus] RUNNING | 31/32 | attempts 1 | Gathering inventory items
-[16:30:22] [Render thread/INFO] (Famulus) task=33a9d010-d378-4b88-9f80-71f36a691000 result={"status":"SUCCESS","message":"Inventory target reached","currentCount":32,"targetCount":32,"attempts":1}
-[16:30:22] [Render thread/INFO] (Minecraft) [System] [CHAT] [Famulus] SUCCESS | 32/32 | attempts 1 | Inventory target reached
-[16:30:23] [Render thread/INFO] (Minecraft) [System] [CHAT] [Famulus] SUCCESS | 32/32 | attempts 0 | Inventory target already satisfied
-[16:30:23] [Render thread/INFO] (Famulus) task=8209fc1d-7f4f-4e52-845b-fd929dd7093f item=minecraft:oak_log result={"status":"SUCCESS","message":"Inventory target already satisfied","currentCount":32,"targetCount":32,"attempts":0}
-[16:30:25] [Server thread/INFO] (Minecraft) Successfully filled 64 block(s)
-[16:30:25] [Render thread/INFO] (Minecraft) [System] [CHAT] [Famulus] RUNNING | 32/96 | attempts 1 | Starting gather attempt 1 of 3
-[16:30:25] [Render thread/INFO] (Famulus) task=2f4e01c3-17f0-447d-8af4-7b8bb3b28e97 item=minecraft:oak_log result={"status":"RUNNING","message":"Starting gather attempt 1 of 3","currentCount":32,"targetCount":96,"attempts":1}
-[16:30:25] [Render thread/INFO] (Minecraft) [System] [CHAT] [Famulus] RUNNING | 32/96 | attempts 1 | Starting gather attempt 1 of 3
-[16:30:25] [Render thread/INFO] (Minecraft) [System] [CHAT] [Famulus] CANCELLED | 32/96 | attempts 1 | Stopped by user
-[16:30:25] [Render thread/INFO] (Famulus) Stopped: {"status":"CANCELLED","message":"Stopped by user","currentCount":32,"targetCount":96,"attempts":1}
-[16:30:26] [Render thread/INFO] (Minecraft) [System] [CHAT] [Famulus] CANCELLED | 32/96 | attempts 1 | Stopped by user
-[16:30:27] [Render thread/INFO] (Minecraft) Stopping!
+[17:19:23] [Render thread/INFO] (Famulus) Famulus 0.1.0 initialized for Minecraft 26.2. Policy offline. Schematic formats: litematic, schem, schematic
+[17:19:25] [Render thread/INFO] (Minecraft) [CHAT] [Baritone] Baritone settings file not found, resetting.
+[17:19:33] [Server thread/INFO] (Minecraft) Teleported Player0 to 0.500000, -60.000000, 0.500000
+[17:19:33] [Server thread/INFO] (Minecraft) No items were found on player Player0
+[17:19:33] [Server thread/INFO] (Minecraft) Gave 1 [Diamond Axe] to Player0
+[17:19:33] [Server thread/INFO] (Minecraft) Successfully filled 32 block(s)
+[17:19:34] [Render thread/INFO] (Minecraft) [System] [CHAT] [Famulus] RUNNING | 0/32 | attempts 1 | Starting gather attempt 1 of 3
+[17:19:34] [Render thread/INFO] (Famulus) task=5b4ee13c-1153-42a9-af0e-cc8d6fdae472 item=minecraft:oak_log result={"status":"RUNNING","message":"Starting gather attempt 1 of 3","currentCount":0,"targetCount":32,"attempts":1}
+[17:19:59] [Render thread/INFO] (Minecraft) [CHAT] [Baritone] Have 32 valid items
+[17:19:59] [Render thread/INFO] (Minecraft) [System] [CHAT] [Famulus] RUNNING | 31/32 | attempts 1 | Gathering inventory items
+[17:19:59] [Render thread/INFO] (Minecraft) [System] [CHAT] [Famulus] No plan. Policy offline, set OPENROUTER_API_KEY.
+[17:19:59] [Render thread/INFO] (Famulus) task=5b4ee13c-1153-42a9-af0e-cc8d6fdae472 result={"status":"SUCCESS","message":"Inventory target reached","currentCount":32,"targetCount":32,"attempts":1}
+[17:19:59] [Render thread/INFO] (Minecraft) [System] [CHAT] [Famulus] SUCCESS | 32/32 | attempts 1 | Inventory target reached
+[17:20:00] [Render thread/INFO] (Minecraft) [System] [CHAT] [Famulus] SUCCESS | 32/32 | attempts 0 | Inventory target already satisfied
+[17:20:00] [Render thread/INFO] (Famulus) task=6aeb0a88-5bd3-45d9-8b3f-4db6226e463b item=minecraft:oak_log result={"status":"SUCCESS","message":"Inventory target already satisfied","currentCount":32,"targetCount":32,"attempts":0}
+[17:20:02] [Server thread/INFO] (Minecraft) Successfully filled 64 block(s)
+[17:20:02] [Render thread/INFO] (Minecraft) [System] [CHAT] [Famulus] RUNNING | 32/96 | attempts 1 | Starting gather attempt 1 of 3
+[17:20:02] [Render thread/INFO] (Famulus) task=9658461a-02f3-4ec4-9f84-2a98e5298769 item=minecraft:oak_log result={"status":"RUNNING","message":"Starting gather attempt 1 of 3","currentCount":32,"targetCount":96,"attempts":1}
+[17:20:02] [Render thread/INFO] (Minecraft) [System] [CHAT] [Famulus] RUNNING | 32/96 | attempts 1 | Starting gather attempt 1 of 3
+[17:20:02] [Render thread/INFO] (Minecraft) [System] [CHAT] [Famulus] No plan. Policy offline, set OPENROUTER_API_KEY.
+[17:20:02] [Render thread/INFO] (Minecraft) [System] [CHAT] [Famulus] CANCELLED | 32/96 | attempts 1 | Stopped by user
+[17:20:02] [Render thread/INFO] (Famulus) Stopped: {"status":"CANCELLED","message":"Stopped by user","currentCount":32,"targetCount":96,"attempts":1}
+[17:20:03] [Render thread/INFO] (Minecraft) [System] [CHAT] [Famulus] CANCELLED | 32/96 | attempts 1 | Stopped by user
+[17:20:03] [Render thread/INFO] (Minecraft) [System] [CHAT] [Famulus] No plan. Policy offline, set OPENROUTER_API_KEY.
+[17:20:04] [Server thread/INFO] (Minecraft) Gave 1 [Diamond Axe] to Player0
+[17:20:04] [Server thread/INFO] (Minecraft) Gave 1 [Diamond Shovel] to Player0
+[17:20:04] [Render thread/INFO] (Famulus) [agent] plan started: queued gather (2 tasks)
+[17:20:04] [Render thread/INFO] (Minecraft) [System] [CHAT] [Famulus] plan started: 2 tasks. Policy offline; failures will just retry.
+[17:20:04] [Render thread/INFO] (Famulus) [agent] running gather 8 minecraft:oak_log
+[17:20:10] [Render thread/INFO] (Minecraft) [CHAT] [Baritone] Have 8 valid items
+[17:20:10] [Render thread/INFO] (Famulus) [agent] SUCCESS: Inventory target reached
+[17:20:10] [Render thread/INFO] (Famulus) [agent] running gather 8 minecraft:dirt
+[17:20:14] [Render thread/INFO] (Minecraft) [CHAT] [Baritone] Have 8 valid items
+[17:20:14] [Render thread/INFO] (Minecraft) [System] [CHAT] [Famulus] CANCELLED | 32/96 | attempts 1 | Stopped by user
+[17:20:14] [Render thread/INFO] (Minecraft) [System] [CHAT] [Famulus] [1/2] RUN_CURRENT - Finished gather 8 minecraft:oak_log; next is gather 8 minecraft:dirt
+[17:20:14] [Render thread/INFO] (Famulus) [agent] SUCCESS: Inventory target reached
+[17:20:14] [Render thread/INFO] (Famulus) [agent] plan PLAN_COMPLETE: Plan complete: queued gather
+[17:20:16] [Render thread/INFO] (Minecraft) Stopping!
 Description: Client shutdown from post-main
