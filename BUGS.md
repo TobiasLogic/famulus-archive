@@ -25,6 +25,25 @@ widen that exemption to make an unrelated failure go quiet.
 
 A desktop player never sees this. It costs a few seconds on quit, and the launcher reaps the process.
 
+## Baritone leaves its scaffolding behind
+
+**Upstream, measured 2026-09-19.** Affects any structure where stray blocks matter.
+
+Baritone *can* build off the ground, contrary to its reputation: a 3x3 platform five blocks up was
+built 9/9. It gets there by pillaring up, which is ordinary movement behaviour, and the pillar
+incidentally supplies the face needed to place the first block. **It then leaves the pillar in
+place**; the probe measured 5 stray blocks under a finished floating platform.
+
+Cosmetic for a solid build, fatal for a flying machine, a redstone farm or any mob farm whose
+spawning platform must be exactly as drawn. Baritone 1.19.0 has no scaffolding setting at all.
+
+Full measurement, the cases still untested, and a proposed fix that needs no Baritone fork are in
+`docs/SCAFFOLDING.md`. Reproduce with:
+
+```bash
+FAMULUS_PROBE_SCAFFOLDING=1 GRADLE_USER_HOME=.cache/gradle ./gradlew :fabric:runClientGameTest
+```
+
 ## Scope boundaries
 
 These are deliberately unbuilt, not broken:

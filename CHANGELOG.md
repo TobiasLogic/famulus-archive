@@ -2,6 +2,12 @@
 
 ## 0.1.0 — Unreleased
 
+- Measured Baritone's behaviour when building off the ground, with a control and a treatment build.
+  It succeeds, contrary to its reputation, but leaves its pillar behind. `docs/SCAFFOLDING.md`.
+- Added `MaterialList` and `MaterialRequirement` to `core`: a deterministic diff of what a blueprint
+  needs against what is held, splitting shortfalls into gatherable and not-yet-obtainable.
+- Added `SchematicAnalyzer` and `SchematicSummary`, which parse a blueprint through Baritone's own
+  schematic registry and count the items it consumes. Supported extensions are queried at runtime.
 - Added the policy seam in `core`: `AgentAction` (the full action set, each marked executable or
   not), `PolicyRequest`, `PolicyDecision`, `PolicyClient` and `PolicyGate`, which turns confidence
   into escalation and aborts after repeated escalation so a confused agent cannot loop forever.

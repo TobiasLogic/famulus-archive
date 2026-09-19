@@ -1,0 +1,4 @@
+[17:03:17] [Render thread/INFO] (Minecraft) [CHAT] [Baritone] Baritone settings file not found, resetting.
+[17:03:53] [Render thread/INFO] (Minecraft) [CHAT] [Baritone] Unable to find any path to BlockOptionalMetaLookup{[BlockOptionalMeta{block=Block{minecraft:oak_log},properties={}}]}, canceling mine
+[17:04:14] [Test thread/INFO] (Minecraft) [STDOUT]: [FamulusProbe] RESULT grounded=9/9 floating=9/9
+[17:04:14] [Test thread/INFO] (Minecraft) [STDOUT]: [FamulusProbe] scaffoldBlocksLeftBehind=5

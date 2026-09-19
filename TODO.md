@@ -7,16 +7,16 @@ iron farm without a rewrite, and that only holds if each layer is reliable befor
 
 - **Milestone 1: collect 32 oak logs.** Verified in a real client, evidence in `docs/acceptance/`.
 - Jev identified, its API contract verified and measured, documented in `docs/JEV.md`.
+- **Schematic material list.** `SchematicAnalyzer` parses through Baritone's registry;
+  `MaterialList` diffs against inventory. 13 tests. Not yet reachable from any command or screen.
+- **Scaffolding measured.** Baritone builds off the ground but leaves its pillar; see
+  `docs/SCAFFOLDING.md`.
 - **Jev client module.** `:jev` plus the `core` policy seam, 27 offline tests and a live smoke test
   verified against the real API.
 
 ## Next
 
-1. **Schematic material list.** Parse a supplied `.litematic`/`.schem` through Baritone's own
-   schematic system, walk it with `getDirect`, and produce an exact block count diffed against the
-   inventory. Fully deterministic; no model involved. This is what makes "I don't have the
-   materials" answerable.
-2. **In-game screen.** A Fabric `Screen` on a keybind listing schematics from a folder, the material
+1. **In-game screen.** A Fabric `Screen` on a keybind listing schematics from a folder, the material
    table, gather and build buttons, and a chat box driving the planner.
 3. **One real Jev decision** above the existing engine, off-thread: at the milestone 2 boundary,
    choose between `DEPOSIT_ITEM` and `COMPLETE_TASK`. Not the whole action set at once.
@@ -32,6 +32,14 @@ iron farm without a rewrite, and that only holds if each layer is reliable befor
 8. **Milestone 5: basic sugar cane farm.**
 9. **Milestone 6: multi-stage farms.**
 10. **Milestone 7: autonomously plan and construct an iron farm.**
+
+## Also queued
+
+- **Scaffolding cleanup.** Snapshot the build region, build, then remove blocks that are present but
+  not in the blueprint. Expressible in Baritone's own API because a wanted-air position is treated as
+  something to break. Needed before any flying machine or redstone farm is worth attempting.
+- **Harder scaffolding cases.** The probe only covered an easy one. Test a position no pillar can
+  reach, a long unsupported horizontal span, and whether `skipFailedLayers` hides a partial build.
 
 ## Ongoing
 

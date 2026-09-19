@@ -6,7 +6,8 @@
   "environment": "client",
   "entrypoints": {
     "fabric-client-gametest": [
-      "dev.famulus.fabric.GatherClientGameTest"
+      "dev.famulus.fabric.GatherClientGameTest",
+      "dev.famulus.fabric.ScaffoldingProbeGameTest"
     ]
   },
   "depends": {

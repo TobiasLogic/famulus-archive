@@ -25,7 +25,12 @@ Evidence including screenshots is committed in `docs/acceptance/2026-09-19/`.
 policy seam have 27 offline tests and a live smoke test verified against the real API, but **no
 command consults them yet**. Nothing in Minecraft currently calls Jev.
 
-**Not written yet:** the LLM planner, the in-game screen and schematic support. No chest deposit, crafting, building
+**Built and tested, but not reachable from the game:** the schematic material list.
+`SchematicAnalyzer` parses a blueprint through Baritone's own registry and counts its items;
+`MaterialList` diffs that against inventory and splits shortfalls into gatherable and not. No command
+or screen exposes it yet.
+
+**Not written yet:** the LLM planner and the in-game screen. No chest deposit, crafting, building
 or farming. No task graph. Gathering covers only direct block drops listed in `GatherCatalog`.
 
 **Do not claim these work:** every recovery path. Retry, stall timeout, task timeout, death,
@@ -91,7 +96,13 @@ even when every assertion passes. See `BUGS.md`.
   Baritone. Tracks ownership so it never cancels a process the user started.
 - `fabric/src/main/java/dev/famulus/fabric/MinecraftObserver.java` — builds `WorldSnapshot`.
 - `fabric/src/gametest/java/dev/famulus/fabric/GatherClientGameTest.java` — the in-client test.
+- `fabric/.../SchematicAnalyzer.java` — parses blueprints via Baritone's registry. Queries
+  `getFileExtensions()` at runtime; do not hardcode a format list.
+- `core/.../MaterialList.java` — the needed-vs-held diff. Deterministic; never ask a model to do it.
+- `fabric/src/gametest/.../ScaffoldingProbeGameTest.java` — opt-in diagnostic, not an acceptance
+  test. Gated on `FAMULUS_PROBE_SCAFFOLDING=1`.
 - `docs/JEV.md` — the verified Jev contract. Read before writing any Jev code.
+- `docs/SCAFFOLDING.md` — what Baritone actually does when building off the ground, and the fix.
 - `docs/DEPENDENCIES.md` — why each version is pinned, with sources.
 
 ## API integration
@@ -208,3 +219,27 @@ and could not read its source sets; fixed with `evaluationDependsOn`. This is wh
 `:jev` did not, and it will bite again for any module sorted after `fabric`.
 
 **Next action:** the schematic material list, then the in-game screen.
+
+### 2026-09-19, third session
+
+**Attempted:** establish whether Baritone can build off the ground, and build the schematic material
+list.
+
+**Completed:** wrote an opt-in probe that builds the same 3x3 platform on the ground and five blocks
+up, so the control proves the harness and the difference isolates the behaviour. Result:
+`grounded=9/9 floating=9/9`, so Baritone **can** build off the ground, but it left 5 stray blocks in
+the column beneath. The accurate defect is that it never removes the pillar it stands on, which is
+fatal for flying machines and redstone farms and merely untidy elsewhere. Written up in
+`docs/SCAFFOLDING.md` with a fix that needs no Baritone fork. Added `MaterialList`,
+`MaterialRequirement`, `SchematicAnalyzer` and `SchematicSummary`.
+
+**Files modified:** four new classes, one new gametest, `docs/SCAFFOLDING.md`, `docs/probes/`,
+`BUGS.md`, `TODO.md`, `CHANGELOG.md`.
+
+**Tests:** 82 offline tests pass, 13 of them new for the material diff. The acceptance test still
+passed in the same run as the probe.
+
+**Problems:** none blocking. The probe covered an easy case only; harder ones are listed in
+`docs/SCAFFOLDING.md` and must not be assumed to work.
+
+**Next action:** the in-game screen, which the user wants tabbed.
