@@ -2,6 +2,14 @@
 
 ## 0.1.0 — Unreleased
 
+- **The policy layer now fires in a real client.** With every log removed, the gather exhausted its
+  attempts and Jev was consulted in game, returning `REQUEST_REPLAN` at replan urgency 0.84. This
+  was the last unverified link in the architecture.
+- Added the `EXPLORE` action and `BaritoneExplorer`. When a resource is not nearby, retrying in the
+  same spot finds the same nothing, so the policy can choose to range outward and then retry.
+  Exploring counts as an attempt, so it cannot wander forever.
+- Measured that Baritone keeps its mine process active when a block type is absent; only the stall
+  timeout catches it. See `BUGS.md`.
 - **In-game control panel**, opened with **G**. Agent, Build and Settings tabs, built on vanilla's
   `MenuTabBar`. All three are photographed by the client test, because a compile proves nothing
   about a GUI.

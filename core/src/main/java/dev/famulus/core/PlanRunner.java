@@ -87,6 +87,8 @@ public final class PlanRunner {
         }
         Map<AgentAction, String> options = new LinkedHashMap<>();
         options.put(AgentAction.RECOVER, "Retry the current task; the problem looks temporary");
+        options.put(AgentAction.EXPLORE,
+                "Nothing suitable is nearby; range outward to find some, then retry the task");
         options.put(AgentAction.COMPLETE_TASK,
                 "Treat the current task as finished and move on to the next one");
         options.put(AgentAction.REQUEST_REPLAN,
@@ -95,7 +97,7 @@ public final class PlanRunner {
         return options;
     }
 
-    /** Applies the policy's answer. Any action other than the offered four aborts, rather than guessing. */
+    /** Applies the policy's answer. Any action that was not offered aborts, rather than being guessed at. */
     public PlanStep onPolicyDecision(AgentAction action) {
         Objects.requireNonNull(action, "action");
         if (step != PlanStep.CONSULT_POLICY) {
@@ -108,12 +110,32 @@ public final class PlanRunner {
                         + " of " + maxAttemptsPerTask;
                 yield step = PlanStep.RUN_CURRENT;
             }
+            case EXPLORE -> {
+                // Exploring counts as an attempt. Otherwise a policy that keeps choosing it would
+                // wander forever without the plan ever giving up.
+                attempts++;
+                reason = "Exploring for " + describeCurrent() + ", attempt " + attempts
+                        + " of " + maxAttemptsPerTask;
+                yield step = PlanStep.EXPLORE;
+            }
             case COMPLETE_TASK -> advance("Policy accepted " + describeCurrent() + " as finished");
             case REQUEST_REPLAN -> fail(PlanStep.REPLAN_REQUIRED,
                     "Policy escalated during " + describeCurrent());
             default -> fail(PlanStep.PLAN_FAILED,
                     "Policy chose " + action + " during " + describeCurrent());
         };
+    }
+
+    /**
+     * Called when an exploration has finished, whether or not it found anything. The task is retried
+     * either way: the observed inventory, not the search, decides whether it succeeds.
+     */
+    public PlanStep onExploreComplete(String summary) {
+        if (step != PlanStep.EXPLORE) {
+            throw new IllegalStateException("Not exploring, the plan is " + step);
+        }
+        reason = summary + "; retrying " + describeCurrent();
+        return step = PlanStep.RUN_CURRENT;
     }
 
     private PlanStep advance(String why) {

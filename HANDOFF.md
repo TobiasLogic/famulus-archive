@@ -27,9 +27,9 @@ reported `PLAN_COMPLETE`. That is asserted in the client test, not just observed
 
 **Wired in:** the Jev policy layer. `:jev` and the `core`
 policy seam have 27 offline tests and a live smoke test verified against the real API.
-`FamulusAgent` consults it off-thread whenever a task fails. **The policy path has not yet been
-exercised in a live client**, because no task has failed during a client run; only the deterministic
-fallback has run in-game.
+`FamulusAgent` consults it off-thread whenever a task fails, and **this is now verified in a live
+client**: with every log removed, the gather exhausted its attempts and Jev returned
+`REQUEST_REPLAN` at replan urgency 0.84. The client test asserts it whenever a key is present.
 
 **Built and tested, but not reachable from the game:** the schematic material list.
 `SchematicAnalyzer` parses a blueprint through Baritone's own registry and counts its items;

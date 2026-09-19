@@ -7,6 +7,8 @@ public enum PlanStep {
     RUN_CURRENT,
     /** Ask the policy layer, off-thread, using {@link PlanRunner#policyOptions()}. */
     CONSULT_POLICY,
+    /** Range outward looking for the current task's resource, then retry it. */
+    EXPLORE,
     PLAN_COMPLETE,
     PLAN_FAILED,
     PLAN_CANCELLED,

@@ -55,7 +55,7 @@ API drift and nothing else. A green build here has never meant the mod gathers a
 The only layer that demonstrates in-game behavior. It drives the real `/famulus` commands in a real
 client and checks the inventory, not Baritone's own reported state.
 
-**Recorded 2026-09-19: all 17 checks held**, including the multi-task plan and the panel. Full procedure, evidence and host details are in
+**Recorded 2026-09-19: 18 checks held** with a key present, 17 without. Full procedure, evidence and host details are in
 [docs/ACCEPTANCE.md](docs/ACCEPTANCE.md).
 
 Use the script, not `./gradlew :fabric:runClientGameTest`. The gradle task exits non-zero even on a
@@ -74,11 +74,26 @@ Four phases, all asserted against the inventory rather than against what Bariton
    is asserted directly: the log line `running gather 8 minecraft:dirt` only appears if the agent
    decided to move on without being told.
 
-5. **The panel.** Each tab is opened and photographed. The screenshots are the test: a layout that
+5. **The policy layer, for real.** Only when `OPENROUTER_API_KEY` is set. Every log is removed and
+   64 are requested, so the task genuinely cannot succeed. The agent must exhaust its attempts and
+   consult Jev in game. Recorded 2026-09-19: `policy chose REQUEST_REPLAN (replan urgency 0.84)`.
+   Ordinary runs skip this and stay offline and free.
+6. **The panel.** Each tab is opened and photographed. The screenshots are the test: a layout that
    silently breaks shows up there and nowhere else.
+
+## Opt-in probes
+
+Diagnostics rather than acceptance tests, each gated on an environment variable because they cost
+minutes:
+
+- `FAMULUS_PROBE_SCAFFOLDING=1` - can Baritone build off the ground? See `docs/SCAFFOLDING.md`.
+- `FAMULUS_PROBE_EXPLORE=1` - does exploring make a distant resource reachable? A superflat world
+  has no sand at any distance, so the probe places some 260 blocks away and first proves it is out
+  of reach before exploring, otherwise the result would mean nothing.
 
 ## What is still unverified
 
-The engine's recovery paths are unit-tested but have never been exercised against real Baritone.
+Several of the engine's recovery paths are unit-tested but have never been exercised against real
+Baritone.
 Nothing has been tested on a multiplayer server, in the Nether or the End, with a non-default
 `observationIntervalTicks`, or with a Baritone version other than the pinned 1.19.0.

@@ -42,6 +42,8 @@ public final class FamulusAgent {
     private static final int POLICY_TIMEOUT_TICKS = 300;
 
     private final GatherController gather;
+    private final BaritoneExplorer explorer = new BaritoneExplorer();
+    private final long exploreTimeoutMillis;
     private final PolicyGate gate;
     private final CredentialStore credentials;
     private final ExecutorService policyThread;
@@ -62,10 +64,13 @@ public final class FamulusAgent {
     private boolean taskStarted;
     private boolean policyDispatched;
     private int policyWaitTicks;
+    private boolean exploring;
+    private long exploreStartedAt;
 
     public FamulusAgent(GatherConfig gatherConfig, PolicyGateConfig policyConfig,
-                        CredentialStore credentials) {
+                        CredentialStore credentials, long exploreTimeoutMillis) {
         this.gather = new GatherController(new BaritoneGatherExecutor(), gatherConfig);
+        this.exploreTimeoutMillis = exploreTimeoutMillis;
         this.credentials = credentials;
         reloadPolicy();
         // The gate holds a stable delegate, so reloading a key never has to rebuild the gate and
@@ -120,6 +125,7 @@ public final class FamulusAgent {
         }
         runner = new PlanRunner(plan, 3);
         taskStarted = false;
+        exploring = false;
         policyDispatched = false;
         policyGeneration++;
         pendingDecision.set(null);
@@ -136,6 +142,7 @@ public final class FamulusAgent {
         switch (runner.step()) {
             case RUN_CURRENT -> runCurrent(client, nowMillis);
             case CONSULT_POLICY -> consultPolicy(client, nowMillis);
+            case EXPLORE -> explore(client, nowMillis);
             default -> { }
         }
     }
@@ -167,6 +174,36 @@ public final class FamulusAgent {
         }
         if (!gather.isRunning()) {
             finishTask(gather.result());
+        }
+    }
+
+    /**
+     * Ranges outward for a bounded time, then retries the task regardless of what was found.
+     * The inventory decides success, so there is nothing to check here beyond the clock.
+     */
+    private void explore(Minecraft client, long nowMillis) {
+        if (!exploring) {
+            exploring = true;
+            exploreStartedAt = nowMillis;
+            try {
+                explorer.start(client);
+                note("exploring for " + runner.current().describe());
+            } catch (RuntimeException failure) {
+                exploring = false;
+                note("could not explore: " + failure.getMessage());
+                runner.onExploreComplete("exploration could not start");
+            }
+            return;
+        }
+        long elapsed = nowMillis - exploreStartedAt;
+        if (elapsed >= exploreTimeoutMillis || !explorer.isActive()) {
+            explorer.cancel();
+            exploring = false;
+            String summary = elapsed >= exploreTimeoutMillis
+                    ? "explored for " + (elapsed / 1000) + "s"
+                    : "exploration ended after " + (elapsed / 1000) + "s";
+            note(summary);
+            runner.onExploreComplete(summary);
         }
     }
 
@@ -237,6 +274,10 @@ public final class FamulusAgent {
 
     public void stop(String reason) {
         gather.stop(reason);
+        if (exploring) {
+            explorer.cancel();
+            exploring = false;
+        }
         if (isRunning()) {
             runner.onTaskResult(new TaskResult(TaskStatus.CANCELLED, reason, 0, 0, 0));
             note("stopped: " + reason);

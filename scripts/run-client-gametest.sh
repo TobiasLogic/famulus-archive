@@ -56,6 +56,12 @@ for shot in gather-running gather-completed inventory-32-oak-logs already-satisf
     fi
 done
 
+# The policy phase only runs when a key is present, so only require its evidence then.
+if [[ -n "${OPENROUTER_API_KEY:-}" ]]; then
+    require_line '[agent] policy chose' \
+        'the policy layer was consulted for a task that could not succeed'
+fi
+
 if grep -q 'AssertionError' "$log"; then
     echo '  FAIL an in-game assertion failed:'
     grep -m 5 -A 2 'AssertionError' "$log" | sed 's/^/       /'

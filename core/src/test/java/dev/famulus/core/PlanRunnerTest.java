@@ -60,6 +60,47 @@ class PlanRunnerTest {
     }
 
     @Test
+    void exploringIsOfferedBecauseARetryInTheSameSpotFindsTheSameNothing() {
+        PlanRunner runner = runner(plan(LOGS));
+        runner.start();
+        runner.onTaskResult(result(TaskStatus.PATH_NOT_FOUND));
+        assertTrue(runner.policyOptions().containsKey(AgentAction.EXPLORE));
+        assertTrue(AgentAction.EXPLORE.isExecutable());
+    }
+
+    @Test
+    void exploringThenRetriesTheSameTask() {
+        PlanRunner runner = runner(plan(LOGS, DIRT));
+        runner.start();
+        runner.onTaskResult(result(TaskStatus.PATH_NOT_FOUND));
+        assertEquals(PlanStep.EXPLORE, runner.onPolicyDecision(AgentAction.EXPLORE));
+        assertEquals(LOGS, runner.current());
+        assertEquals(PlanStep.RUN_CURRENT, runner.onExploreComplete("explored for 90s"));
+        assertEquals(LOGS, runner.current());
+        assertTrue(runner.reason().contains("explored for 90s"));
+    }
+
+    @Test
+    void exploringCountsAsAnAttemptSoItCannotWanderForever() {
+        PlanRunner runner = new PlanRunner(plan(LOGS), 2);
+        runner.start();
+        assertEquals(1, runner.attempts());
+        runner.onTaskResult(result(TaskStatus.PATH_NOT_FOUND));
+        runner.onPolicyDecision(AgentAction.EXPLORE);
+        assertEquals(2, runner.attempts());
+        runner.onExploreComplete("explored");
+        assertEquals(PlanStep.PLAN_FAILED, runner.onTaskResult(result(TaskStatus.PATH_NOT_FOUND)),
+                "The attempt budget must still run out even when exploring is chosen every time");
+    }
+
+    @Test
+    void exploreCompletionOutsideAnExplorationIsRejected() {
+        PlanRunner runner = runner(plan(LOGS));
+        runner.start();
+        assertThrows(IllegalStateException.class, () -> runner.onExploreComplete("nope"));
+    }
+
+    @Test
     void completeTaskAcceptsAFailureAndMovesOn() {
         PlanRunner runner = runner(plan(LOGS, DIRT));
         runner.start();

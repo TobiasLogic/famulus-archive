@@ -13,6 +13,8 @@ public enum AgentAction {
     MINE(false),
     CRAFT(false),
     TRAVEL(false),
+    /** Range outward looking for a resource that is not nearby. */
+    EXPLORE(true),
     BUILD(false),
     PLACE_BLOCK(false),
     INTERACT(false),

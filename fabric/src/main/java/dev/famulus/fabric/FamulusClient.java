@@ -61,7 +61,8 @@ public final class FamulusClient implements ClientModInitializer {
             controller = new GatherController(executor, config.gather());
             credentials = new CredentialStore(
                     FabricLoader.getInstance().getConfigDir().resolve("famulus"));
-            agent = new FamulusAgent(config.gather(), PolicyGateConfig.defaults(), credentials);
+            agent = new FamulusAgent(config.gather(), PolicyGateConfig.defaults(), credentials,
+                    config.exploreTimeoutMillis());
         } catch (Exception e) {
             configurationError = "Fix config/famulus.properties and restart: " + e.getMessage();
             LOGGER.error("Famulus configuration is invalid. {}", configurationError, e);
@@ -112,6 +113,11 @@ public final class FamulusClient implements ClientModInitializer {
      * The control panel, or null before the mod has initialised. Used by the keybind and by the
      * client test, and available for a mod menu integration later.
      */
+    /** The live agent, or null before initialisation. Used by the client test to observe decisions. */
+    public static FamulusAgent agent() {
+        return instance == null ? null : instance.agent;
+    }
+
     public static FamulusScreen createScreen() {
         return createScreen(0);
     }

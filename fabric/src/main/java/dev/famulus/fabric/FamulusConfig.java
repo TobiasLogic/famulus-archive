@@ -7,7 +7,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Properties;
 
-public record FamulusConfig(GatherConfig gather, int observationIntervalTicks) {
+public record FamulusConfig(GatherConfig gather, int observationIntervalTicks,
+                            long exploreTimeoutMillis) {
     public static FamulusConfig load(Path path) throws IOException {
         if (!Files.exists(path)) {
             Files.createDirectories(path.getParent());
@@ -19,6 +20,8 @@ public record FamulusConfig(GatherConfig gather, int observationIntervalTicks) {
                     retryDelayMillis=2000
                     maxAttempts=3
                     observationIntervalTicks=5
+                    # How long to range outward when a resource cannot be found nearby.
+                    exploreTimeoutMillis=90000
                     """);
         }
         Properties values = new Properties();
@@ -32,7 +35,11 @@ public record FamulusConfig(GatherConfig gather, int observationIntervalTicks) {
         if (interval < 1 || interval > 20) {
             throw new IllegalArgumentException("observationIntervalTicks must be between 1 and 20");
         }
-        return new FamulusConfig(gather, interval);
+        long exploreTimeout = number(values, "exploreTimeoutMillis", 90000);
+        if (exploreTimeout < 1000) {
+            throw new IllegalArgumentException("exploreTimeoutMillis must be at least 1000");
+        }
+        return new FamulusConfig(gather, interval, exploreTimeout);
     }
 
     private static long number(Properties values, String key, long fallback) {

@@ -44,6 +44,25 @@ Full measurement, the cases still untested, and a proposed fix that needs no Bar
 FAMULUS_PROBE_SCAFFOLDING=1 GRADLE_USER_HOME=.cache/gradle ./gradlew :fabric:runClientGameTest
 ```
 
+## Baritone does not surrender when a resource is absent
+
+**Upstream, measured 2026-09-19.** Makes every unobtainable gather slow.
+
+With every oak log removed from the world, `mineByName` kept its process **active**. It emitted one
+"Unable to find any path" message and carried on regardless, so `isActive()` never went false and the
+inactive-pickup grace never fired. The only thing that caught it was the engine's 60 second stall
+timeout, three times over: the task took **2m13s** to fail instead of seconds.
+
+Two consequences, both already acted on:
+
+- The stall timeout is not a nicety, it is the sole safety net for an absent resource. Do not raise
+  it casually, and consider lowering it for short tasks.
+- **Retrying in place is pointless when the resource simply is not there.** This is why `EXPLORE`
+  exists as a policy option: the only useful recovery is to go somewhere else. See
+  `BaritoneExplorer` and `docs/JEV.md`.
+
+Reproduced by the policy phase of the client test, which clears the logs and asks for 64.
+
 ## Scope boundaries
 
 These are deliberately unbuilt, not broken:

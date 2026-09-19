@@ -103,6 +103,29 @@ public final class GatherClientGameTest implements FabricClientGameTest {
             command(context, "/famulus status");
             context.takeScreenshot("famulus-plan-complete");
 
+            // The policy layer, exercised for real. The task must genuinely fail, and it must fail
+            // quickly: when a block type is absent entirely Baritone stays active searching and the
+            // engine only sees a 60s stall, three times over. Removing every log instead makes
+            // Baritone report that it cannot path to one, so the attempt ends in seconds.
+            // Skipped without a key, so ordinary runs stay offline and free.
+            if (System.getenv("OPENROUTER_API_KEY") != null) {
+                world.getServer().runCommand("clear @a");
+                world.getServer().runCommand("give @a minecraft:diamond_axe 1");
+                world.getServer().runCommand("fill 2 -60 2 9 -60 9 minecraft:air");
+                context.waitTick();
+                world.getConnection().waitForClientboundPackets();
+                command(context, "/famulus queue minecraft:oak_log=64");
+                context.waitFor(client -> consulted(), 6000);
+                context.runOnClient(client -> {
+                    require(consulted(), "The policy must be consulted when a task cannot succeed");
+                    require(decision().isPresent(), "The decision must be recorded in the log");
+                });
+                context.waitFor(client -> FamulusClient.agent() != null
+                        && !FamulusClient.agent().isRunning(), 12000);
+                context.takeScreenshot("famulus-policy-escalation");
+                System.out.println("[FamulusPolicy] " + decision().orElse("no decision"));
+            }
+
             // The control panel. A compile proves nothing about a GUI, so open it and photograph
             // every tab. Each screenshot is a chance to see a layout that silently went wrong.
             context.setScreen(FamulusClient::createScreen);
@@ -132,6 +155,19 @@ public final class GatherClientGameTest implements FabricClientGameTest {
 
     private static int dirtCount(Minecraft client) {
         return client.player.getInventory().countItem(Items.DIRT);
+    }
+
+    /** True once the agent has recorded a policy answer. */
+    private static boolean consulted() {
+        return decision().isPresent();
+    }
+
+    private static java.util.Optional<String> decision() {
+        FamulusAgent agent = FamulusClient.agent();
+        if (agent == null) {
+            return java.util.Optional.empty();
+        }
+        return agent.recentLog().stream().filter(line -> line.startsWith("policy chose")).findFirst();
     }
 
     private static boolean isMining() {
