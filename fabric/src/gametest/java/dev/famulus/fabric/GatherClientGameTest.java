@@ -102,6 +102,20 @@ public final class GatherClientGameTest implements FabricClientGameTest {
             });
             command(context, "/famulus status");
             context.takeScreenshot("famulus-plan-complete");
+
+            // The control panel. A compile proves nothing about a GUI, so open it and photograph
+            // every tab. Each screenshot is a chance to see a layout that silently went wrong.
+            context.setScreen(FamulusClient::createScreen);
+            context.waitTick();
+            context.takeScreenshot("famulus-screen-agent");
+            context.setScreen(() -> FamulusClient.createScreen(1));
+            context.waitTick();
+            context.takeScreenshot("famulus-screen-build");
+            context.setScreen(() -> FamulusClient.createScreen(2));
+            context.waitTick();
+            context.takeScreenshot("famulus-screen-settings");
+            context.setScreen(() -> null);
+            context.waitTick();
         }
     }
 

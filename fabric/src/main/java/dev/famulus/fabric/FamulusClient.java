@@ -4,6 +4,7 @@ import com.google.gson.Gson;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import dev.famulus.core.GatherController;
+import dev.famulus.jev.CredentialStore;
 import dev.famulus.core.MaterialList;
 import dev.famulus.core.MaterialRequirement;
 import dev.famulus.core.PlannedTask;
@@ -19,7 +20,10 @@ import java.util.UUID;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallback;
 import net.fabricmc.fabric.api.client.command.v2.FabricClientCommandSource;
+import com.mojang.blaze3d.platform.InputConstants;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
+import net.fabricmc.fabric.api.client.keymapping.v1.KeyMappingHelper;
+import net.minecraft.client.KeyMapping;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.client.Minecraft;
 import net.minecraft.commands.arguments.IdentifierArgument;
@@ -37,9 +41,12 @@ public final class FamulusClient implements ClientModInitializer {
     public static final Logger LOGGER = LoggerFactory.getLogger("Famulus");
     private static final Gson JSON = new Gson();
     public static final MinecraftObserver OBSERVER = new MinecraftObserver();
+    private static FamulusClient instance;
     private final BaritoneGatherExecutor executor = new BaritoneGatherExecutor();
     private GatherController controller;
     private FamulusAgent agent;
+    private CredentialStore credentials;
+    private KeyMapping openScreen;
     private int agentTicks;
     private FamulusConfig config;
     private String configurationError;
@@ -48,10 +55,13 @@ public final class FamulusClient implements ClientModInitializer {
 
     @Override
     public void onInitializeClient() {
+        instance = this;
         try {
             config = FamulusConfig.load(FabricLoader.getInstance().getConfigDir().resolve("famulus.properties"));
             controller = new GatherController(executor, config.gather());
-            agent = new FamulusAgent(config.gather(), PolicyGateConfig.defaults());
+            credentials = new CredentialStore(
+                    FabricLoader.getInstance().getConfigDir().resolve("famulus"));
+            agent = new FamulusAgent(config.gather(), PolicyGateConfig.defaults(), credentials);
         } catch (Exception e) {
             configurationError = "Fix config/famulus.properties and restart: " + e.getMessage();
             LOGGER.error("Famulus configuration is invalid. {}", configurationError, e);
@@ -89,10 +99,28 @@ public final class FamulusClient implements ClientModInitializer {
                                                 .executes(context -> gather(context.getSource(),
                                                         context.getArgument("item", Identifier.class),
                                                         IntegerArgumentType.getInteger(context, "count"))))))));
+        openScreen = KeyMappingHelper.registerKeyMapping(new KeyMapping(
+                "key.famulus.open", InputConstants.Type.KEYSYM,
+                InputConstants.KEY_G, KeyMapping.Category.MISC));
         ClientTickEvents.END_CLIENT_TICK.register(this::tick);
         LOGGER.info("Famulus 0.1.0 initialized for Minecraft 26.2. Policy {}. Schematic formats: {}",
-                agent != null && agent.isPolicyConfigured() ? "ready" : "offline",
+                agent == null ? "unavailable" : agent.policyState(),
                 String.join(", ", SchematicAnalyzer.supportedExtensions()));
+    }
+
+    /**
+     * The control panel, or null before the mod has initialised. Used by the keybind and by the
+     * client test, and available for a mod menu integration later.
+     */
+    public static FamulusScreen createScreen() {
+        return createScreen(0);
+    }
+
+    public static FamulusScreen createScreen(int tab) {
+        if (instance == null || instance.agent == null) {
+            return null;
+        }
+        return new FamulusScreen(instance.agent, instance.credentials, tab);
     }
 
     private int gather(FabricClientCommandSource source, Identifier item, int count) {
@@ -122,6 +150,12 @@ public final class FamulusClient implements ClientModInitializer {
     }
 
     private void tick(Minecraft client) {
+        if (openScreen != null && agent != null) {
+            // Key mappings do not fire while a screen is open, so no open-screen check is needed.
+            while (openScreen.consumeClick()) {
+                client.setScreenAndShow(new FamulusScreen(agent, credentials));
+            }
+        }
         if (agent != null && agent.isRunning() && ++agentTicks % config.observationIntervalTicks() == 0) {
             try {
                 agent.tick(client, now());

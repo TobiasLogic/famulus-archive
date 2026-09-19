@@ -41,6 +41,11 @@ public record JevConfig(String endpoint, String model, String apiKey, Duration t
         }
     }
 
+    /** Builds a default OpenRouter configuration around an already resolved key. */
+    public static JevConfig withKey(String apiKey) {
+        return new JevConfig(OPENROUTER_DECISIONS, DEFAULT_MODEL, apiKey, Duration.ofSeconds(10));
+    }
+
     /**
      * Reads the key from the environment.
      *

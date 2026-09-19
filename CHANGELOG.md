@@ -2,6 +2,14 @@
 
 ## 0.1.0 — Unreleased
 
+- **In-game control panel**, opened with **G**. Agent, Build and Settings tabs, built on vanilla's
+  `MenuTabBar`. All three are photographed by the client test, because a compile proves nothing
+  about a GUI.
+- **API keys can be set in game.** `CredentialStore` keeps them in their own owner-only file, away
+  from ordinary settings, masked on screen, never logged, and overridable by the environment.
+  Saving a key reloads the policy client without restarting Minecraft.
+- Measured which schematic formats Baritone actually registers: **litematic, schem, schematic**. A
+  Litematica file needs no Litematica mod.
 - **The agent now chains tasks.** `PlanRunner` walks a `TaskPlan` and asks the policy layer when a
   task fails; `FamulusAgent` drives it in-game and consults Jev off-thread on a daemon worker.
 - New commands: `/famulus queue <item>=<n>, ...` runs several gather tasks as one plan,

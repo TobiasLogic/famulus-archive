@@ -36,7 +36,11 @@ fallback has run in-game.
 `MaterialList` diffs that against inventory and splits shortfalls into gatherable and not. No command
 or screen exposes it yet.
 
-**Not written yet:** the LLM planner and the in-game screen. No chest deposit, crafting, building
+**Working in game:** the control panel, opened with **G**. Agent, Build and Settings tabs, all three
+photographed by the client test. API keys can be pasted and saved from Settings; saving reloads the
+policy client without a restart.
+
+**Not written yet:** the LLM planner and the Chat tab. No chest deposit, crafting, building
 or farming. No task graph. Gathering covers only direct block drops listed in `GatherCatalog`.
 
 **Do not claim these work:** every recovery path. Retry, stall timeout, task timeout, death,
@@ -107,6 +111,9 @@ even when every assertion passes. See `BUGS.md`.
 - `core/.../MaterialList.java` — the needed-vs-held diff. Deterministic; never ask a model to do it.
 - `fabric/src/gametest/.../ScaffoldingProbeGameTest.java` — opt-in diagnostic, not an acceptance
   test. Gated on `FAMULUS_PROBE_SCAFFOLDING=1`.
+- `fabric/.../FamulusScreen.java` — the panel. 26.2 has no immediate-mode text drawing, so every
+  line is a `StringWidget` refreshed in `tick()`. Tabs are vanilla's `MenuTabBar`.
+- `jev/.../CredentialStore.java` — key storage. Owner-only file, masked display, env override.
 - `docs/JEV.md` — the verified Jev contract. Read before writing any Jev code.
 - `docs/SCAFFOLDING.md` — what Baritone actually does when building off the ground, and the fix.
 - `docs/DEPENDENCIES.md` — why each version is pinned, with sources.
@@ -121,8 +128,17 @@ candidate on the same key.
 
 ### Environment variables
 
-`OPENROUTER_API_KEY` — required once Jev or the planner is wired in. **Never commit it.** No key
-exists anywhere in this repository and none may be added. `.gitignore` already excludes `.env`.
+`OPENROUTER_API_KEY` — optional. Without it the agent still runs and retries failures
+deterministically instead of reconsulting the policy.
+
+A key can also be saved from the Settings tab. `CredentialStore` writes
+`config/famulus/credentials.properties` with owner-only permissions, deliberately separate from
+`famulus.properties` so a settings file pasted into a bug report cannot carry a secret. The
+environment variable takes precedence over the stored file. Only a masked form is ever shown or
+logged, and the input field is cleared as soon as a key is saved.
+
+**Never commit a key.** No key exists anywhere in this repository and none may be added.
+`.gitignore` excludes `.env`, and the game's config directory is outside the repository anyway.
 
 ## Decisions already made
 
@@ -273,3 +289,30 @@ tested artifact is the committed one.
 
 **Next action:** the tabbed in-game screen. `FamulusAgent.recentLog()` and `PlanRunner.progress()`
 already expose what the Agent tab needs.
+
+### 2026-09-19, fifth session
+
+**Attempted:** the tabbed control panel, including in-game API key entry.
+
+**Completed:** `FamulusScreen` with Agent, Build and Settings tabs on vanilla's `MenuTabBar`, opened
+with **G**. `CredentialStore` with 11 tests: owner-only permissions, masking, environment
+precedence, blank-key refusal. Saving a key swaps the policy client through an `AtomicReference`, so
+a new key works without restarting Minecraft. The client test opens and photographs all three tabs
+and the classifier now requires those screenshots; 17 checks pass.
+
+**Surprises worth knowing:** Minecraft 26.2 dropped immediate-mode rendering. `Screen.render` is
+gone, replaced by `extractRenderState(GuiGraphicsExtractor, ...)`, and `GuiGraphics` has no text
+methods at all, so custom drawing is impractical and everything must be a widget. `TabButton` is
+abstract now; use `MenuTabBar.builder(tabManager, width).addTabs(...)`. `Minecraft.setScreen` is
+`setScreenAndShow`. Fabric's helper is `KeyMappingHelper.registerKeyMapping` in
+`...api.client.keymapping.v1`, not the old `KeyBindingHelper`.
+
+**Also measured:** Baritone registers **litematic, schem, schematic**, so a Litematica file parses
+without the Litematica mod. This had been an explicit open question.
+
+**Files modified:** `FamulusScreen`, `CredentialStore` and its tests, `FamulusAgent`, `FamulusClient`,
+`JevConfig`, the gametest, the classifier, the language file, and the documentation set.
+
+**Tests:** 110 offline tests. Client acceptance 17/17.
+
+**Next action:** the Chat tab and the LLM planner behind it.

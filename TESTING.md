@@ -55,7 +55,7 @@ API drift and nothing else. A green build here has never meant the mod gathers a
 The only layer that demonstrates in-game behavior. It drives the real `/famulus` commands in a real
 client and checks the inventory, not Baritone's own reported state.
 
-**Recorded 2026-09-19: all 14 checks held**, including the multi-task plan phase. Full procedure, evidence and host details are in
+**Recorded 2026-09-19: all 17 checks held**, including the multi-task plan and the panel. Full procedure, evidence and host details are in
 [docs/ACCEPTANCE.md](docs/ACCEPTANCE.md).
 
 Use the script, not `./gradlew :fabric:runClientGameTest`. The gradle task exits non-zero even on a
@@ -73,6 +73,9 @@ Four phases, all asserted against the inventory rather than against what Bariton
    agent must reach the second task by itself. That unprompted advance is the autonomy claim, so it
    is asserted directly: the log line `running gather 8 minecraft:dirt` only appears if the agent
    decided to move on without being told.
+
+5. **The panel.** Each tab is opened and photographed. The screenshots are the test: a layout that
+   silently breaks shows up there and nowhere else.
 
 ## What is still unverified
 

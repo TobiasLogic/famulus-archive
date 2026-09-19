@@ -31,6 +31,16 @@ Jev is `typesafe/jev-1.13`, a structured decision model whose option set *is* it
 the valid action set is enforced rather than requested. See [ARCHITECTURE.md](ARCHITECTURE.md) for
 the full design and [docs/JEV.md](docs/JEV.md) for the measured API contract.
 
+## The panel
+
+Press **G** in game to open the control panel. Three tabs:
+
+- **Agent** - what it is doing and why: plan progress, policy state, and a live decision log.
+- **Build** - blueprints found on disk, their material shortfall, and a button to go collect it.
+- **Settings** - paste an API key and save it. Stored owner-only in
+  `config/famulus/credentials.properties`, never in this repository. `OPENROUTER_API_KEY` overrides
+  it, and the key is shown masked once saved.
+
 ## Commands
 
 | Command | Effect |
@@ -57,8 +67,9 @@ Set `OPENROUTER_API_KEY` in your environment to enable the policy layer. Without
 runs, it simply retries failures deterministically instead of reconsidering them. No key is stored in
 this repository and none should be added.
 
-Blueprints go in `config/famulus/schematics/`. `/famulus materials` lists the formats this
-installation can actually parse, since that comes from Baritone's registry at runtime.
+Blueprints go in `config/famulus/schematics/`. Baritone 1.19.0 registers **litematic, schem and
+schematic**, measured at runtime rather than assumed, so a Litematica file works without the
+Litematica mod installed. The Build tab lists whatever the installed Baritone reports.
 
 Install the matching Baritone API Fabric jar alongside Famulus and Fabric API in the same
 instance. `docs/DEPENDENCIES.md` explains which Baritone distribution is correct and why.

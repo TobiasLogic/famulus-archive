@@ -16,6 +16,7 @@ import dev.famulus.core.TaskPlan;
 import dev.famulus.core.TaskResult;
 import dev.famulus.core.TaskStatus;
 import dev.famulus.core.WorldSnapshot;
+import dev.famulus.jev.CredentialStore;
 import dev.famulus.jev.JevClient;
 import dev.famulus.jev.JevConfig;
 import java.util.ArrayDeque;
@@ -42,8 +43,11 @@ public final class FamulusAgent {
 
     private final GatherController gather;
     private final PolicyGate gate;
-    private final boolean policyConfigured;
+    private final CredentialStore credentials;
     private final ExecutorService policyThread;
+    /** Swapped when a key is saved, so a new key takes effect without restarting Minecraft. */
+    private final AtomicReference<PolicyClient> policyClient = new AtomicReference<>();
+    private volatile String policyState = "not configured";
     private final Deque<String> log = new ArrayDeque<>();
 
     /**
@@ -59,24 +63,15 @@ public final class FamulusAgent {
     private boolean policyDispatched;
     private int policyWaitTicks;
 
-    public FamulusAgent(GatherConfig gatherConfig, PolicyGateConfig policyConfig) {
+    public FamulusAgent(GatherConfig gatherConfig, PolicyGateConfig policyConfig,
+                        CredentialStore credentials) {
         this.gather = new GatherController(new BaritoneGatherExecutor(), gatherConfig);
-
-        PolicyClient client;
-        boolean configured;
-        try {
-            client = new JevClient(JevConfig.fromEnvironment());
-            configured = true;
-        } catch (RuntimeException notConfigured) {
-            // No key is a normal state, not an error. The gate falls back to retrying, so the agent
-            // still works deterministically; it simply stops being able to reconsider.
-            client = request -> {
-                throw new PolicyException(notConfigured.getMessage());
-            };
-            configured = false;
-        }
-        this.policyConfigured = configured;
-        this.gate = new PolicyGate(client, policyConfig, AgentAction.RECOVER);
+        this.credentials = credentials;
+        reloadPolicy();
+        // The gate holds a stable delegate, so reloading a key never has to rebuild the gate and
+        // lose its escalation counter mid-plan.
+        this.gate = new PolicyGate(request -> policyClient.get().decide(request),
+                policyConfig, AgentAction.RECOVER);
         // Daemon threads on purpose: Baritone's own non-daemon pool is why the client cannot exit
         // cleanly (see BUGS.md), and this project will not add a second instance of that bug.
         this.policyThread = Executors.newSingleThreadExecutor(runnable -> {
@@ -86,8 +81,32 @@ public final class FamulusAgent {
         });
     }
 
+    /**
+     * Rebuilds the policy client from the stored or environment key. Safe to call at any time; a
+     * plan in progress keeps running either way, because an unconfigured policy just falls back.
+     */
+    public void reloadPolicy() {
+        String key = credentials.resolve().orElse(null);
+        if (key == null || key.isBlank()) {
+            policyState = "offline, no API key";
+            policyClient.set(request -> {
+                throw new PolicyException("No API key. Set one in the Settings tab or "
+                        + JevConfig.API_KEY_VARIABLE + ".");
+            });
+            return;
+        }
+        policyClient.set(new JevClient(JevConfig.withKey(key)));
+        policyState = "ready (" + CredentialStore.mask(key)
+                + (credentials.isOverriddenByEnvironment() ? ", from environment)" : ")");
+    }
+
     public boolean isPolicyConfigured() {
-        return policyConfigured;
+        return credentials.resolve().isPresent();
+    }
+
+    /** A line for the Settings tab. Contains a masked key, never a usable one. */
+    public String policyState() {
+        return policyState;
     }
 
     public boolean isRunning() {
@@ -228,7 +247,7 @@ public final class FamulusAgent {
 
     public String status() {
         if (runner == null) {
-            return "No plan. " + (policyConfigured ? "Policy ready." : "Policy offline, set OPENROUTER_API_KEY.");
+            return "No plan. Policy " + policyState + ".";
         }
         return runner.progress();
     }

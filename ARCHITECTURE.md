@@ -120,10 +120,24 @@ states, diff against the inventory. No model is involved, and per the design pri
 be. A supplied blueprint is already a structured plan, so schematic building does not depend on the
 LLM planner existing; the planner is needed to *design* a farm, not to build a given one.
 
-Query `getFileExtensions()` at runtime and report what is supported rather than hardcoding a list.
-The jar also contains a `LitematicaHelper`, and `buildOpenSchematic()` / `buildOpenLitematic(int)`
-read a projection from the Litematica or Schematica mods when those are installed, which is a
-different path from reading a file directly.
+`getFileExtensions()` is queried at runtime rather than hardcoded. On 2026-09-19 the pinned Baritone
+reported **litematic, schem, schematic**, so a Litematica file is parsed directly and does not need
+the Litematica mod. Keep asking rather than assuming: a different Baritone build may register a
+different set. `buildOpenSchematic()` and `buildOpenLitematic(int)` are a separate path that reads a
+projection from the Litematica or Schematica mods when those are installed.
+
+## The panel
+
+Minecraft 26.2 replaced immediate-mode drawing with render-state extraction, and `GuiGraphics` no
+longer has text methods at all. Every line in `FamulusScreen` is therefore a `StringWidget` whose
+message is refreshed in `tick()`, and the tab bar is vanilla's own `MenuTabBar`, so it matches the
+rest of the game rather than reimplementing tabs.
+
+Credentials are deliberately kept out of `famulus.properties`. Settings get pasted into bug reports
+and screenshots; a key should not travel with them. `CredentialStore` writes
+`config/famulus/credentials.properties` with owner-only permissions where the filesystem supports
+it, the environment variable takes precedence over the file, the field is cleared the moment a key
+is saved, and only a masked form is ever displayed or logged.
 
 ## Rules that must not be undone
 
