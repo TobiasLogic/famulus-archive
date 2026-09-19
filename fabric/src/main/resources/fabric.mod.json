@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "id": "famulus",
+  "version": "${version}",
+  "name": "Famulus",
+  "description": "Structured Minecraft tasks with deterministic Baritone execution.",
+  "environment": "client",
+  "entrypoints": {"client": ["dev.famulus.fabric.FamulusClient"]},
+  "depends": {
+    "fabricloader": ">=0.19.5",
+    "minecraft": "26.2",
+    "java": ">=25",
+    "fabric-api": ">=0.160.0",
+    "baritone": "1.19.0"
+  }
+}
