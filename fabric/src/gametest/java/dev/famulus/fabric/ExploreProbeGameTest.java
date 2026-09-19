@@ -26,7 +26,7 @@ public final class ExploreProbeGameTest implements FabricClientGameTest {
     /** Far enough to be outside the loaded area at spawn, near enough to reach in a few minutes. */
     private static final int SAND_DISTANCE = 260;
     private static final int CONTROL_TICKS = 600;
-    private static final int EXPLORE_TICKS = 1200;
+    private static final int EXPLORE_TICKS = 4800;
     private static final int GATHER_TICKS = 1200;
 
     @Override
@@ -49,7 +49,33 @@ public final class ExploreProbeGameTest implements FabricClientGameTest {
             context.waitTick();
             world.getConnection().waitForChunksRender();
 
-            // Control: the sand must be genuinely out of reach to begin with.
+            // Positive control. Without this a zero at the end is ambiguous: it would look the same
+            // whether exploring failed to help or gathering sand never worked in the first place.
+            // Sand is placed within reach and must be collected.
+            world.getServer().runCommand("fill 3 " + (GROUND_Y + 1) + " 3 6 "
+                    + (GROUND_Y + 1) + " 6 minecraft:sand");
+            context.waitTick();
+            world.getConnection().waitForClientboundPackets();
+            command(context, "/famulus queue minecraft:sand=8");
+            int nearby = waitForSand(context, CONTROL_TICKS);
+            command(context, "/famulus stop");
+            context.waitTick();
+            System.out.println("[FamulusExplore] positive control, sand within reach: " + nearby);
+            if (nearby < 8) {
+                throw new AssertionError("Sand 5 blocks away was not gathered (" + nearby
+                        + "/8), so nothing this probe measures about exploring can be trusted");
+            }
+            world.getServer().runCommand("clear @a");
+            world.getServer().runCommand("give @a minecraft:diamond_shovel 1");
+            world.getServer().runCommand("fill 3 " + (GROUND_Y + 1) + " 3 6 "
+                    + (GROUND_Y + 1) + " 6 minecraft:air");
+            // Dropped sand from the positive control would otherwise be picked up later and read as
+            // progress toward the distant patch.
+            world.getServer().runCommand("kill @e[type=minecraft:item]");
+            context.waitTick();
+            world.getConnection().waitForClientboundPackets();
+
+            // Negative control: the distant sand must be genuinely out of reach to begin with.
             command(context, "/famulus queue minecraft:sand=8");
             int controlCount = waitForSand(context, CONTROL_TICKS);
             command(context, "/famulus stop");

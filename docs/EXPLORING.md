@@ -15,20 +15,38 @@ recovery is to go somewhere else, which is why `EXPLORE` is offered to the polic
 
 ## What was measured
 
-A superflat world has no sand at any distance, so a patch was placed deliberately at (260, 260),
-about 368 blocks from spawn. A control gather confirmed it was genuinely out of reach first, since
-without that a later failure would be meaningless.
+A superflat world has no sand at any distance, so a patch was placed deliberately at (260, 260).
+The probe runs three checks, and all three are needed:
 
-**Exploring works.** The process engaged immediately and stayed active, and the player covered
-hundreds of blocks under its control.
+| Check | Purpose | Result |
+| --- | --- | --- |
+| **Positive control**: sand 5 blocks away | Prove gathering sand works at all | **8/8**, twice |
+| **Negative control**: distant sand, no exploring | Prove it is genuinely out of reach | **0** |
+| **Treatment**: explore, then gather | Does exploring bridge the gap | **0** |
 
-**The gather still failed.** `control=0 afterExploring=0`.
+The positive control is the one that makes the rest mean anything. Without it a final zero looks
+identical whether exploring failed to help or gathering sand never worked in the first place.
+
+**Exploring works, in the sense that it engages and moves.** The process stayed active throughout
+and the player covered hundreds of blocks under its control.
+
+**It did not find the sand**, across two runs with a 60s and a 240s budget.
 
 ## Why it failed, and what that means
 
-The first version of this probe measured **distance from spawn**, which was the wrong metric. It
-showed the player reaching 259 blocks and looked like progress, but exploring is undirected: 259
-blocks from spawn is usually 259 blocks the wrong way. The probe now measures distance to the sand.
+Three versions of this probe were wrong before it measured anything trustworthy, and each failure
+looked like a result. It waited for exploring to become inactive, which never happens. It measured
+distance from **spawn** rather than to the target, so wandering the wrong way read as progress. It
+had no positive control, so a zero was unattributable. It also counted sand dropped by the positive
+control, which made the negative control read 3 instead of 0.
+
+With the metric corrected, two runs give **opposite trends**:
+
+- 60s budget: 326 to 189 blocks from the sand, closing steadily.
+- 240s budget: 529 out to **645**, then back to 337. Target was 260 blocks out.
+
+One run trending toward the target was not evidence of direction; it was luck, and reading it as
+convergence was a mistake. Taken together the two runs are what an undirected search looks like.
 
 So the honest reading is not "exploring is broken". It is:
 
@@ -53,7 +71,10 @@ Options, roughly in order of promise. None are implemented yet.
 
 ## Honest status
 
-`EXPLORE` is implemented, unit tested, and confirmed to engage Baritone and move the player. It has
-**not** been shown to make a specific distant resource obtainable, and on the evidence so far a blind
-exploration is unlikely to do so reliably. Treat it as a way to see more of the world, not as a
-solution to "go and find me this block".
+`EXPLORE` is implemented, unit tested, and confirmed to engage Baritone and move the player a long
+way. It has **not** been shown to make a specific distant resource obtainable, and on two runs with
+opposite trajectories it should not be expected to. Treat it as a way to see more of the world, not
+as a solution to "go and find me this block".
+
+Gathering itself is fine: the positive control collected 8 of 8 from sand five blocks away, twice.
+Nothing measured here indicates a problem in the gather engine.
