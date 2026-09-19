@@ -6,4 +6,4 @@ pluginManagement {
     }
 }
 rootProject.name = 'Famulus'
-include 'core', 'jev', 'fabric'
+include 'core', 'jev', 'planner', 'fabric'

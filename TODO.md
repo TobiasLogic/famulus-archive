@@ -11,7 +11,9 @@ iron farm without a rewrite, and that only holds if each layer is reliable befor
   failure, bounded retries. `/famulus queue`, `/famulus materials`, `/famulus collect`.
 - **Schematic material list.** `SchematicAnalyzer` parses through Baritone's registry;
   `MaterialList` diffs against inventory. 13 tests. Not yet reachable from any command or screen.
-- **In-game panel** with Agent, Build and Settings tabs, and in-game API key entry.
+- **In-game panel** with Agent, Chat, Build and Settings tabs, in-game API key entry, and a planner
+  model selector supporting OpenRouter and local servers.
+- **LLM planner.** Sentence in, validated plan out, verified against a real model.
 - **Policy verified in a live client.** Jev consulted in game on a task that could not succeed.
 - **`EXPLORE` action** backed by Baritone's explore process, for when a resource is not nearby.
 - **Scaffolding measured.** Baritone builds off the ground but leaves its pillar; see
@@ -21,8 +23,10 @@ iron farm without a rewrite, and that only holds if each layer is reliable befor
 
 ## Next
 
-1. **Chat tab and the LLM planner.** The panel has room for it; the planner is the missing piece.
-2. **Old item 1, now done: in-game screen.** A Fabric `Screen` on a keybind listing schematics from a folder, the material
+1. **`BUILD` executor.** Baritone already builds schematics and reads `.litematic` directly. Wiring
+   `IBuilderProcess.build` to `PlannedTask.Build` is the shortest path to something impressive: drop
+   a blueprint in, have it gather the materials and then construct it.
+2. **Old item 1, now done: in-game screen and the LLM planner.** A Fabric `Screen` on a keybind listing schematics from a folder, the material
    table, gather and build buttons, and a chat box driving the planner.
 3. **One real Jev decision** above the existing engine, off-thread: at the milestone 2 boundary,
    choose between `DEPOSIT_ITEM` and `COMPLETE_TASK`. Not the whole action set at once.

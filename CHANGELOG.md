@@ -2,6 +2,15 @@
 
 ## 0.1.0 — Unreleased
 
+- **The LLM planner exists.** A Chat tab takes a sentence and produces a validated task plan, which
+  can then be run. Verified against a real model: "build a small wooden shelter, get me the wood and
+  some dirt" returned two executable gather tasks, and a request for diamonds was refused rather
+  than turned into work that would fail.
+- **Model selector** in Settings: a model field, an endpoint field, and presets for OpenRouter,
+  Ollama and llama.cpp. Any OpenAI-compatible server works, and a local one needs no API key.
+- `PlanParser` rejects anything a model gets wrong: prose, code fences, unknown task types, missing
+  namespaces, absurd counts, unobtainable items, duplicate ids, and actions with no executor.
+  24 tests on the planner module alone.
 - **The policy layer now fires in a real client.** With every log removed, the gather exhausted its
   attempts and Jev was consulted in game, returning `REQUEST_REPLAN` at replan urgency 0.84. This
   was the last unverified link in the architecture.

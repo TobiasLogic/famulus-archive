@@ -12,9 +12,10 @@ User goal
 ```
 
 **Implementation status.** The task engine and Baritone execution are built and verified in a real
-client. The Jev policy client is built and tested against the live API, but **nothing in the mod
-calls it yet**: no command consults it. The LLM planner is not written and its model is unassigned.
-Do not read this document as a description of working software above the task engine line.
+client, and the Jev policy layer is wired in and verified consulting Jev in game. The LLM planner is
+built: it turns a sentence into a validated plan, against any OpenAI-compatible endpoint, and was
+confirmed against a real model. What remains unbuilt is every executor other than gathering, so a
+plan that needs building or depositing is refused rather than half-run.
 
 ## Layer responsibilities
 
@@ -125,6 +126,20 @@ reported **litematic, schem, schematic**, so a Litematica file is parsed directl
 the Litematica mod. Keep asking rather than assuming: a different Baritone build may register a
 different set. `buildOpenSchematic()` and `buildOpenLitematic(int)` are a separate path that reads a
 projection from the Litematica or Schematica mods when those are installed.
+
+## The planner
+
+`ChatPlanner` speaks the OpenAI chat completions shape, so OpenRouter, Ollama, llama.cpp and LM
+Studio all work by changing two fields. Choosing a model is configuration, not code, and a local
+server needs no key.
+
+`PlanParser` is the boundary that matters. Everything arriving from a model is untrusted text: it
+may be malformed, wrapped in prose, name blocks that do not exist, or ask for a million of something.
+A plan is either fully valid or rejected with a reason. There is no partial acceptance, because a
+half-understood plan executed in someone's world is worse than no plan.
+
+The set of gatherable items is sent to the model **and** enforced on the way back. Telling it what
+can be obtained makes a usable plan likely; checking again makes an unusable one impossible.
 
 ## The panel
 

@@ -8,7 +8,7 @@ import java.nio.file.Path;
 import java.util.Properties;
 
 public record FamulusConfig(GatherConfig gather, int observationIntervalTicks,
-                            long exploreTimeoutMillis) {
+                            long exploreTimeoutMillis, String plannerEndpoint, String plannerModel) {
     public static FamulusConfig load(Path path) throws IOException {
         if (!Files.exists(path)) {
             Files.createDirectories(path.getParent());
@@ -22,6 +22,10 @@ public record FamulusConfig(GatherConfig gather, int observationIntervalTicks,
                     observationIntervalTicks=5
                     # How long to range outward when a resource cannot be found nearby.
                     exploreTimeoutMillis=90000
+                    # The planner speaks the OpenAI chat completions shape, so any compatible server
+                    # works: OpenRouter, Ollama, llama.cpp or LM Studio. A local one needs no key.
+                    plannerEndpoint=https://openrouter.ai/api/v1/chat/completions
+                    plannerModel=deepseek/deepseek-v4.1-flash
                     """);
         }
         Properties values = new Properties();
@@ -39,7 +43,10 @@ public record FamulusConfig(GatherConfig gather, int observationIntervalTicks,
         if (exploreTimeout < 1000) {
             throw new IllegalArgumentException("exploreTimeoutMillis must be at least 1000");
         }
-        return new FamulusConfig(gather, interval, exploreTimeout);
+        String plannerEndpoint = values.getProperty("plannerEndpoint",
+                "https://openrouter.ai/api/v1/chat/completions").trim();
+        String plannerModel = values.getProperty("plannerModel", "deepseek/deepseek-v4.1-flash").trim();
+        return new FamulusConfig(gather, interval, exploreTimeout, plannerEndpoint, plannerModel);
     }
 
     private static long number(Properties values, String key, long fallback) {

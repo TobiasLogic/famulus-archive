@@ -133,8 +133,11 @@ public final class GatherClientGameTest implements FabricClientGameTest {
             context.takeScreenshot("famulus-screen-agent");
             context.setScreen(() -> FamulusClient.createScreen(1));
             context.waitTick();
-            context.takeScreenshot("famulus-screen-build");
+            context.takeScreenshot("famulus-screen-chat");
             context.setScreen(() -> FamulusClient.createScreen(2));
+            context.waitTick();
+            context.takeScreenshot("famulus-screen-build");
+            context.setScreen(() -> FamulusClient.createScreen(3));
             context.waitTick();
             context.takeScreenshot("famulus-screen-settings");
             context.setScreen(() -> null);

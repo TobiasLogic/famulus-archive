@@ -6,6 +6,7 @@ import dev.famulus.core.PlannedTask;
 import dev.famulus.core.TaskPlan;
 import dev.famulus.jev.CredentialStore;
 import dev.famulus.jev.JevConfig;
+import dev.famulus.planner.PlannerConfig;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
@@ -36,37 +37,38 @@ public final class FamulusScreen extends Screen {
 
     private final FamulusAgent agent;
     private final CredentialStore credentials;
+    private final PlannerService planner;
     private final TabManager tabManager = new TabManager(this::addRenderableWidget, this::removeWidget);
 
     private AgentTab agentTab;
+    private ChatTab chatTab;
     private BuildTab buildTab;
     private SettingsTab settingsTab;
     private MenuTabBar tabBar;
 
     private final int initialTab;
 
-    public FamulusScreen(FamulusAgent agent, CredentialStore credentials) {
-        this(agent, credentials, 0);
-    }
-
     /** {@code initialTab} lets the client test photograph each tab without simulating clicks. */
-    public FamulusScreen(FamulusAgent agent, CredentialStore credentials, int initialTab) {
+    public FamulusScreen(FamulusAgent agent, CredentialStore credentials,
+                         PlannerService planner, int initialTab) {
         super(Component.literal("Famulus"));
         this.agent = agent;
         this.credentials = credentials;
+        this.planner = planner;
         this.initialTab = initialTab;
     }
 
     @Override
     protected void init() {
         agentTab = new AgentTab();
+        chatTab = new ChatTab();
         buildTab = new BuildTab();
         settingsTab = new SettingsTab();
         tabBar = MenuTabBar.builder(tabManager, width)
-                .addTabs(agentTab, buildTab, settingsTab)
+                .addTabs(agentTab, chatTab, buildTab, settingsTab)
                 .build();
         addRenderableWidget(tabBar);
-        tabBar.selectTab(Math.max(0, Math.min(initialTab, 2)), false);
+        tabBar.selectTab(Math.max(0, Math.min(initialTab, 3)), false);
         repositionElements();
         refresh();
     }
@@ -92,6 +94,9 @@ public final class FamulusScreen extends Screen {
         }
         if (settingsTab != null) {
             settingsTab.refresh();
+        }
+        if (chatTab != null) {
+            chatTab.refresh();
         }
     }
 
@@ -136,6 +141,88 @@ public final class FamulusScreen extends Screen {
                 int index = from + i;
                 logLines.get(i).setMessage(row(index < recent.size() ? recent.get(index) : ""));
             }
+        }
+    }
+
+    /** Ask for something in plain language, see the plan it produces, then run it. */
+    private final class ChatTab extends GridLayoutTab {
+        private final EditBox goalField;
+        private final StringWidget status;
+        private final List<StringWidget> planLines = new ArrayList<>();
+        private final Button runButton;
+        private TaskPlan pending;
+
+        ChatTab() {
+            super(Component.literal("Chat"));
+            layout.spacing(3);
+            int nextRow = 0;
+            line(layout, nextRow++, "Ask for something. The planner turns it into tasks.");
+            goalField = new EditBox(font, ROW_WIDTH, 18, Component.literal("goal"));
+            goalField.setMaxLength(300);
+            goalField.setHint(Component.literal("get me wood and dirt for a shelter"));
+            layout.addChild(goalField, nextRow++, 0);
+
+            GridLayout buttons = new GridLayout().spacing(4);
+            buttons.addChild(Button.builder(Component.literal("Plan"), b -> requestPlan()).width(72).build(), 0, 0);
+            runButton = Button.builder(Component.literal("Run plan"), b -> runPlan()).width(88).build();
+            runButton.active = false;
+            buttons.addChild(runButton, 0, 1);
+            buttons.addChild(Button.builder(Component.literal("Stop"),
+                    b -> agent.stop("Stopped from the screen")).width(72).build(), 0, 2);
+            layout.addChild(buttons, nextRow++, 0);
+
+            status = line(layout, nextRow++, "idle");
+            for (int i = 0; i < 6; i++) {
+                planLines.add(line(layout, nextRow++, ""));
+            }
+        }
+
+        private void requestPlan() {
+            String goal = goalField.getValue().trim();
+            if (goal.isEmpty()) {
+                status.setMessage(row("type what you want first"));
+                return;
+            }
+            pending = null;
+            runButton.active = false;
+            planLines.forEach(widget -> widget.setMessage(Component.empty()));
+            if (!planner.request(goal, minecraft)) {
+                status.setMessage(row(planner.state()));
+            }
+        }
+
+        private void runPlan() {
+            if (pending == null) {
+                return;
+            }
+            try {
+                agent.start(pending);
+                status.setMessage(row("running: " + pending.goal()));
+                runButton.active = false;
+                pending = null;
+            } catch (RuntimeException refused) {
+                status.setMessage(row(refused.getMessage()));
+            }
+        }
+
+        void refresh() {
+            // A finished plan is collected once, then held until the user chooses to run it.
+            planner.takePlan().ifPresent(plan -> {
+                pending = plan;
+                runButton.active = true;
+                for (int i = 0; i < planLines.size(); i++) {
+                    planLines.get(i).setMessage(row(i < plan.tasks().size()
+                            ? (i + 1) + ". " + plan.tasks().get(i).describe() : ""));
+                }
+                if (plan.tasks().size() > planLines.size()) {
+                    planLines.get(planLines.size() - 1).setMessage(
+                            row("... and " + (plan.tasks().size() - planLines.size() + 1) + " more"));
+                }
+            });
+            if (pending == null && !planner.isBusy()) {
+                runButton.active = false;
+            }
+            status.setMessage(row(agent.isRunning() ? agent.status() : planner.state()));
         }
     }
 
@@ -271,6 +358,9 @@ public final class FamulusScreen extends Screen {
         private final EditBox keyField;
         private final StringWidget keyStatus;
         private final StringWidget note;
+        private final EditBox modelField;
+        private final EditBox endpointField;
+        private final StringWidget plannerNote;
 
         SettingsTab() {
             super(Component.literal("Settings"));
@@ -289,6 +379,29 @@ public final class FamulusScreen extends Screen {
             layout.addChild(buttons, nextRow++, 0);
 
             note = line(layout, nextRow++, "");
+
+            line(layout, nextRow++, "Planner model. Any OpenAI-compatible server works.");
+            modelField = new EditBox(font, ROW_WIDTH, 18, Component.literal("model"));
+            modelField.setMaxLength(120);
+            modelField.setValue(planner.model());
+            layout.addChild(modelField, nextRow++, 0);
+            endpointField = new EditBox(font, ROW_WIDTH, 18, Component.literal("endpoint"));
+            endpointField.setMaxLength(200);
+            endpointField.setValue(planner.endpoint());
+            layout.addChild(endpointField, nextRow++, 0);
+
+            GridLayout presets = new GridLayout().spacing(4);
+            presets.addChild(Button.builder(Component.literal("OpenRouter"),
+                    b -> preset(PlannerConfig.OPENROUTER, PlannerConfig.DEFAULT_MODEL)).width(88).build(), 0, 0);
+            presets.addChild(Button.builder(Component.literal("Ollama"),
+                    b -> preset(PlannerConfig.OLLAMA, "llama3.2")).width(72).build(), 0, 1);
+            presets.addChild(Button.builder(Component.literal("llama.cpp"),
+                    b -> preset(PlannerConfig.LLAMA_CPP, "local-model")).width(80).build(), 0, 2);
+            presets.addChild(Button.builder(Component.literal("Apply"),
+                    b -> applyPlanner()).width(64).build(), 0, 3);
+            layout.addChild(presets, nextRow++, 0);
+            plannerNote = line(layout, nextRow++, "");
+
             line(layout, nextRow++, "Saved owner-only to config/famulus/" + CredentialStore.FILE_NAME);
             line(layout, nextRow++, "The " + JevConfig.API_KEY_VARIABLE + " variable overrides it.");
             line(layout, nextRow++, "Without a key the agent runs; failures just retry.");
@@ -320,6 +433,30 @@ public final class FamulusScreen extends Screen {
             } catch (Exception failure) {
                 note.setMessage(row("could not clear: " + failure.getMessage()));
             }
+        }
+
+        private void preset(String endpoint, String model) {
+            endpointField.setValue(endpoint);
+            modelField.setValue(model);
+            plannerNote.setMessage(row("press Apply to use it"));
+        }
+
+        private void applyPlanner() {
+            String endpoint = endpointField.getValue().trim();
+            String model = modelField.getValue().trim();
+            if (endpoint.isEmpty() || model.isEmpty()) {
+                plannerNote.setMessage(row("both a model and an endpoint are needed"));
+                return;
+            }
+            if (!endpoint.startsWith("http://") && !endpoint.startsWith("https://")) {
+                plannerNote.setMessage(row("endpoint must start with http:// or https://"));
+                return;
+            }
+            planner.configure(endpoint, model);
+            boolean local = endpoint.contains("localhost") || endpoint.contains("127.0.0.1");
+            plannerNote.setMessage(row(local
+                    ? "using local " + model + "; no key needed"
+                    : "using " + model));
         }
 
         void refresh() {

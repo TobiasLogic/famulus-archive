@@ -40,7 +40,13 @@ or screen exposes it yet.
 photographed by the client test. API keys can be pasted and saved from Settings; saving reloads the
 policy client without a restart.
 
-**Not written yet:** the LLM planner and the Chat tab. No chest deposit, crafting, building
+**The LLM planner works.** The Chat tab turns a sentence into a validated plan you can run.
+`ChatPlanner` speaks the OpenAI chat completions shape, so OpenRouter or a local Ollama, llama.cpp
+or LM Studio all work by changing two fields in Settings; a local server needs no key. Verified
+against a real model.
+
+**Not written yet:** every executor except gathering. A plan needing `BUILD` or `DEPOSIT_ITEM` is
+refused up front rather than half-run. No chest deposit, crafting, building
 or farming. No task graph. Gathering covers only direct block drops listed in `GatherCatalog`.
 
 **Do not claim these work:** every recovery path. Retry, stall timeout, task timeout, death,
@@ -118,6 +124,10 @@ even when every assertion passes. See `BUGS.md`.
 - `docs/SCAFFOLDING.md` — what Baritone actually does when building off the ground, and the fix.
 - `docs/CONTAINERS.md` — the researched API for deposits and shulker overflow. Nothing implemented
   yet; read it before starting `DEPOSIT_ITEM`.
+- `planner/.../PlanParser.java` — the planning security boundary. Model output is untrusted text;
+  a plan is fully valid or rejected. Read it before changing anything about planning.
+- `planner/.../PlannerConfig.java` — endpoint and model. Presets for OpenRouter, Ollama, llama.cpp.
+- `fabric/.../PlannerService.java` — runs planning off-thread on a daemon worker.
 - `docs/EXPLORING.md` — why `EXPLORE` exists, and the measured limit: it moves the player but has
   not been shown to find a specific distant resource. Read before trusting it.
 - `docs/DEPENDENCIES.md` — why each version is pinned, with sources.
@@ -345,3 +355,26 @@ four plan tests. Researched the container API for deposits and shulkers into `do
 **Tests:** 110 offline tests. Client acceptance 18/18 with a key, 17 without.
 
 **Next action:** `getToBlock` as a directed alternative to blind exploring, then the container layer.
+
+### 2026-09-19, seventh session
+
+**Attempted:** build the LLM planner with a model selector, and stop commits showing a second
+contributor.
+
+**Completed:** the `:planner` module. `ChatPlanner` against any OpenAI-compatible endpoint, and
+`PlanParser`, which is the real work: model output is untrusted text and a plan is either fully
+valid or refused. 24 module tests plus a live smoke test against a real model, which returned two
+executable gather tasks for "build a small wooden shelter" and declined a request for diamonds.
+Added the Chat tab and a Settings model selector with OpenRouter, Ollama and llama.cpp presets.
+
+**Attribution:** the user asked not to appear as a co-author. All ten commits were rewritten to drop
+the `Co-Authored-By` trailer and a backup branch `backup-before-trailer-strip` holds the old history.
+**The force push is still pending**: the sandbox blocks it, so the user runs
+`git push --force-with-lease origin main` themselves. Do not add that trailer to future commits.
+
+**Tests:** 140 offline tests. Client acceptance 18/18 with a key, 17 without, now including all four
+tabs.
+
+**Next action:** the `BUILD` executor. Baritone already builds schematics and reads `.litematic`
+directly, so wiring `IBuilderProcess.build` to `PlannedTask.Build` is the shortest path to a
+blueprint being gathered for and then constructed.

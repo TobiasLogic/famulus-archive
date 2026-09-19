@@ -46,6 +46,7 @@ public final class FamulusClient implements ClientModInitializer {
     private GatherController controller;
     private FamulusAgent agent;
     private CredentialStore credentials;
+    private PlannerService planner;
     private KeyMapping openScreen;
     private int agentTicks;
     private FamulusConfig config;
@@ -63,6 +64,7 @@ public final class FamulusClient implements ClientModInitializer {
                     FabricLoader.getInstance().getConfigDir().resolve("famulus"));
             agent = new FamulusAgent(config.gather(), PolicyGateConfig.defaults(), credentials,
                     config.exploreTimeoutMillis());
+            planner = new PlannerService(credentials, config.plannerEndpoint(), config.plannerModel());
         } catch (Exception e) {
             configurationError = "Fix config/famulus.properties and restart: " + e.getMessage();
             LOGGER.error("Famulus configuration is invalid. {}", configurationError, e);
@@ -126,7 +128,7 @@ public final class FamulusClient implements ClientModInitializer {
         if (instance == null || instance.agent == null) {
             return null;
         }
-        return new FamulusScreen(instance.agent, instance.credentials, tab);
+        return new FamulusScreen(instance.agent, instance.credentials, instance.planner, tab);
     }
 
     private int gather(FabricClientCommandSource source, Identifier item, int count) {
@@ -159,7 +161,7 @@ public final class FamulusClient implements ClientModInitializer {
         if (openScreen != null && agent != null) {
             // Key mappings do not fire while a screen is open, so no open-screen check is needed.
             while (openScreen.consumeClick()) {
-                client.setScreenAndShow(new FamulusScreen(agent, credentials));
+                client.setScreenAndShow(new FamulusScreen(agent, credentials, planner, 0));
             }
         }
         if (agent != null && agent.isRunning() && ++agentTicks % config.observationIntervalTicks() == 0) {

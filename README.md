@@ -21,7 +21,7 @@ deferred until the deterministic path is validated, and no endpoint has been inv
 
 | Layer | Role | Status |
 | --- | --- | --- |
-| LLM planner | Research, task graphs, failure analysis, replanning | Not written; model not chosen |
+| LLM planner | Turns a sentence into a validated task plan | Built; any OpenAI-compatible model |
 | [Jev](docs/JEV.md) | Picks the next action from an explicitly defined set, flags when replanning is needed | Wired in: consulted off-thread when a task fails |
 | Plan runner | Walks a plan task by task, asks the policy when one fails, bounds retries | Built, 15 unit tests |
 | Task engine | Task ownership, retry and deadline bounds, what counts as done | Built, 42 unit tests |
@@ -36,8 +36,10 @@ the full design and [docs/JEV.md](docs/JEV.md) for the measured API contract.
 Press **G** in game to open the control panel. Three tabs:
 
 - **Agent** - what it is doing and why: plan progress, policy state, and a live decision log.
+- **Chat** - ask for something in plain language, see the plan it produces, then run it.
 - **Build** - blueprints found on disk, their material shortfall, and a button to go collect it.
-- **Settings** - paste an API key and save it. Stored owner-only in
+- **Settings** - paste an API key, and choose the planner model and endpoint. One-click presets for
+  OpenRouter, Ollama and llama.cpp; a local server needs no key at all. Stored owner-only in
   `config/famulus/credentials.properties`, never in this repository. `OPENROUTER_API_KEY` overrides
   it, and the key is shown masked once saved.
 

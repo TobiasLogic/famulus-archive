@@ -9,7 +9,7 @@ about whether the mod works in Minecraft.
 GRADLE_USER_HOME=.cache/gradle ./gradlew :core:test
 ```
 
-**97 tests, all passing as of 2026-09-19**, across `:core` and `:jev`. `core` has no Minecraft or Baritone types, so the state
+**140 tests, all passing as of 2026-09-19**, across `:core`, `:jev` and `:planner`. `core` has no Minecraft or Baritone types, so the state
 machine runs against a fake executor and hand-written observations. Coverage includes existing
 inventory, progress, stalled and failed execution, retry exhaustion, the absolute task deadline,
 cancellation, cancellation *failure*, disconnect, death, dimension change, pickup grace after the
