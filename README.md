@@ -17,6 +17,19 @@ was already met, and cancelling cleanly on `/famulus stop`. Evidence is in
 This is a gather prototype, not an autonomous farm builder. Jev and LLM calls are deliberately
 deferred until the deterministic path is validated, and no endpoint has been invented for either.
 
+## Layers
+
+| Layer | Role | Status |
+| --- | --- | --- |
+| LLM planner | Research, task graphs, failure analysis, replanning | Not written; model not chosen |
+| [Jev](docs/JEV.md) | Picks the next action from an explicitly defined set, flags when replanning is needed | Contract verified, no integration code yet |
+| Task engine | Task ownership, retry and deadline bounds, what counts as done | Built, 42 unit tests |
+| Baritone | Pathfinding, movement, mining, building | Working, verified in-client |
+
+Jev is `typesafe/jev-1.13`, a structured decision model whose option set *is* its output schema, so
+the valid action set is enforced rather than requested. See [ARCHITECTURE.md](ARCHITECTURE.md) for
+the full design and [docs/JEV.md](docs/JEV.md) for the measured API contract.
+
 ## Commands
 
 | Command | Effect |
@@ -35,6 +48,9 @@ half-attempted.
 GRADLE_USER_HOME=.cache/gradle ./gradlew build               # compile and unit test
 ./scripts/run-client-gametest.sh                             # client acceptance
 ```
+
+Set `OPENROUTER_API_KEY` in your environment once the Jev or planner layers are wired in. No key is
+stored in this repository and none should be added.
 
 Install the matching Baritone API Fabric jar alongside Famulus and Fabric API in the same
 instance. `docs/DEPENDENCIES.md` explains which Baritone distribution is correct and why.

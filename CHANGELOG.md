@@ -2,6 +2,10 @@
 
 ## 0.1.0 — Unreleased
 
+- Identified **Jev** as `typesafe/jev-1.13`, a TypeSafe System One structured decision model, and
+  verified its contract by direct API calls: `POST https://openrouter.ai/api/alpha/decisions`,
+  median latency 0.78s, $0.000026 per call. Documented in `docs/JEV.md`. No integration code yet.
+- Rewrote `ARCHITECTURE.md` around the three verified layers, marking clearly which exist.
 - Named the project **Famulus**, Latin for attendant. The working name BariModel described the
   dependency rather than the project; packages are now `dev.famulus.*`, the mod id is `famulus` and
   the command is `/famulus`. Verified in a real client after the rename.

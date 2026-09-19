@@ -1,69 +1,172 @@
 # Famulus handoff
 
-## Status — 2026-09-19, milestone 1 verified in a real client
+Read this first. It is the continuation document: assume the previous agent is gone and cannot be
+asked anything.
 
-`/famulus gather minecraft:oak_log 32` works in Minecraft 26.2. It was observed collecting 0 to 32 oak
-logs in 25 seconds in one attempt, refusing to mine when the target was already satisfied, and
-cancelling cleanly on `/famulus stop`. Evidence, including screenshots, is in
-`docs/acceptance/2026-09-19/` and the procedure is in `docs/ACCEPTANCE.md`.
+## What this project is
 
-This is a gather prototype. There is no planner, no Jev, no crafting and no farm logic.
+An autonomous Minecraft agent in three layers. An LLM plans, **Jev** picks the next action from an
+explicitly defined set, and **Baritone** executes deterministically. Famulus is Latin for attendant.
+Target is **Minecraft Java 26.2, Fabric, Java 25**. A 1.21.x port is wanted eventually; the exact
+version is undecided, so **do not lower the target to solve a build or dependency problem**.
 
-## Non-negotiable scope
+The long-term goal is "build an iron farm" from a single user sentence. The path there is
+incremental: gather, gather into a chest, a cobblestone platform, a wheat farm, a sugar cane farm,
+multi-stage farms, then the iron farm. Do not skip ahead.
 
-- All project work and downloaded build tools belong under `/home/htfi/Documents/CODE/openchat/empty/Famulus`.
-- Target Minecraft **26.2**. Exact future 1.21.x support remains undecided; do not silently change target.
-- Planner -> policy -> deterministic executor -> observed state. Keep network calls out of the tick loop.
-- First gather, then Jev, then LLM; do not start iron-farm logic yet.
-- No API keys or user Minecraft account credentials in repository or logs.
+## Status, 2026-09-19
 
-## What is verified, and what is only claimed
+**Working and verified in a real client:** `/famulus gather <item> <count>`, `/famulus status`,
+`/famulus stop`. The gather milestone was observed collecting 0 to 32 oak logs in 25 seconds in one
+attempt, declining to mine when the target was already satisfied, and cancelling cleanly on stop.
+Evidence including screenshots is committed in `docs/acceptance/2026-09-19/`.
 
-Verified: 42 engine unit tests; compilation against real 26.2 + Baritone 1.19.0; the gather,
-already-satisfied and user-stop paths in a real client.
+**Not written yet:** the Jev policy layer and the LLM planner. No chest deposit, crafting, building
+or farming. No task graph. Gathering covers only direct block drops listed in `GatherCatalog`.
 
-Not verified in-game: every recovery path. Retry, stall timeout, task timeout, death, disconnect,
-dimension change and inventory-full exist and are unit-tested against a fake executor, but have
-never run against real Baritone. Do not describe them as working.
+**Verified but unimplemented:** Jev's API contract. It was called successfully and its behavior
+measured; see `docs/JEV.md`. No code in this repository calls it yet.
 
-## Decisions and current work
+**Do not claim these work:** every recovery path. Retry, stall timeout, task timeout, death,
+disconnect, dimension change and inventory-full are covered by 42 unit tests against a fake
+executor, but have never run against real Baritone in a live client.
 
-- Fabric client integration; an independent Java task engine allows a later version adapter without rewriting control logic.
-- Gather count means an inventory target, including existing stacks; this matches Baritone quantity semantics.
-- Commands: `/famulus gather <item> <count>`, `/famulus status`, `/famulus stop`.
-- Upstream Baritone v1.19.0 supports Minecraft 26.2. Pin the official API Fabric artifact; inspect metadata and checksums before use.
-- Java 25.0.3 is installed. No system Gradle or Maven executable was found.
-- Network downloads need the execution tool's network escalation in this environment. Keep Gradle user cache inside `.cache/gradle`.
-- `./gradlew :fabric:runClientGameTest` exits 248 on success because of an upstream Baritone shutdown defect. Run `./scripts/run-client-gametest.sh` instead; see `BUGS.md`.
+## Most recent work
 
-## Relevant paths
+Found and verified Jev. It was absent from OpenRouter's public model catalog, which made it look
+non-existent; it is real, and the contract is now documented. Before that: renamed the project from
+the working name BariModel to Famulus, added LGPL-3.0, and pushed to a private GitHub repository.
 
-- `core/`: typed tasks, observations, results, bounded recovery, policy seam, deterministic tests.
-- `fabric/`: Minecraft state collection, commands and Baritone API adapter.
-- `scripts/`: `fetch-baritone.sh` pins and checksums the dependency, `run-client-gametest.sh` runs and classifies client acceptance.
-- `docs/`: dependency evidence, the acceptance procedure, and archived run evidence under `docs/acceptance/`.
-- `examples/`: the structured task shape. No code parses it; it documents the planner boundary.
+## Environment
 
-## Next work
+| Thing | Value |
+| --- | --- |
+| Minecraft Java | 26.2 |
+| Mod loader | Fabric, Loader 0.19.5, Fabric API 0.160.0+26.2 |
+| Baritone | 1.19.0, the **API Fabric** distribution specifically |
+| Java | 25 (25.0.3 installed) |
+| Gradle / Loom | 9.5.1 / 1.17.21 |
+| Host | Arch Linux, OpenJDK 25.0.3, RTX 3050 Mobile, Wayland driving `DISPLAY=:0` |
+| Repository | private, `TobiasLogic/famulus`, LGPL-3.0 |
 
-1. Decide whether Jev is real and reachable. Its model identity, API contract and latency budget are still unknown, and nothing should be built against a guess.
-2. Exercise a recovery path in a real client, so the retry and timeout logic stops being unverified. Breaking Baritone's path mid-task is the cheapest way in.
-3. Put the project under version control. Nothing here is committed yet.
-4. Extend `GatherCatalog` only alongside the drop and tool rules a wider set needs.
-5. Decide the exact 1.21.x target before writing a second adapter.
+Minecraft 26.x is **unobfuscated**: use ordinary `implementation` / `compileOnly` configurations and
+the plain `jar` task. Do not copy Yarn mappings, `modImplementation` or `remapJar` from older guides.
 
-## Sources checked
+There is no system Gradle or Maven. Keep the Gradle user cache inside `.cache/gradle`. There is no
+Xvfb, so the client test opens a real window for about four minutes.
 
-- https://github.com/cabaletta/baritone/releases/tag/v1.19.0
-- https://fabricmc.net/2026/06/15/262.html
+## Commands
+
+```bash
+./scripts/fetch-baritone.sh                            # pinned, checksum-verified dependency
+GRADLE_USER_HOME=.cache/gradle ./gradlew build         # compile + 42 unit tests
+GRADLE_USER_HOME=.cache/gradle ./gradlew :core:test    # engine tests only
+./scripts/run-client-gametest.sh                       # client acceptance, archives evidence
+./scripts/run-client-gametest.sh --classify-only       # re-classify the last run, no relaunch
+```
+
+**Do not run `./gradlew :fabric:runClientGameTest` directly and believe the result.** It exits 248
+even when every assertion passes. See `BUGS.md`.
+
+## Files that matter
+
+- `core/src/main/java/dev/famulus/core/GatherController.java` — the state machine. No I/O, no
+  Minecraft types, takes observations plus a monotonic clock. Everything important lives here.
+- `core/src/main/java/dev/famulus/core/` — `GatherTask` (validates its own fields), `TaskStatus`,
+  `TaskResult`, `WorldSnapshot`, `GatherConfig`, `GatherExecutor` (the execution seam).
+- `core/src/test/java/dev/famulus/core/GatherControllerTest.java` — 42 tests, fake executor.
+- `fabric/src/main/java/dev/famulus/fabric/FamulusClient.java` — entrypoint, commands, tick loop.
+- `fabric/src/main/java/dev/famulus/fabric/BaritoneGatherExecutor.java` — the only file calling
+  Baritone. Tracks ownership so it never cancels a process the user started.
+- `fabric/src/main/java/dev/famulus/fabric/MinecraftObserver.java` — builds `WorldSnapshot`.
+- `fabric/src/gametest/java/dev/famulus/fabric/GatherClientGameTest.java` — the in-client test.
+- `docs/JEV.md` — the verified Jev contract. Read before writing any Jev code.
+- `docs/DEPENDENCIES.md` — why each version is pinned, with sources.
+
+## API integration
+
+Jev is `typesafe/jev-1.13`, called at **`POST https://openrouter.ai/api/alpha/decisions`**. It is a
+decisions model, not a chat model; `/chat/completions` rejects it. Median latency 0.78 s, about
+$0.000026 per call. Full request and response shapes, measurements and design consequences are in
+`docs/JEV.md`. The planner LLM is not chosen yet; `deepseek/deepseek-v4.1-flash` is a cheap
+candidate on the same key.
+
+### Environment variables
+
+`OPENROUTER_API_KEY` — required once Jev or the planner is wired in. **Never commit it.** No key
+exists anywhere in this repository and none may be added. `.gitignore` already excludes `.env`.
+
+## Decisions already made
+
+- Fabric, with a Minecraft-independent task engine so a later version adapter does not require
+  rewriting control logic.
+- Gather count is a **target inventory total**, including items already held. This matches Baritone's
+  own quantity semantics.
+- Completion is an observed inventory count. Baritone going inactive is evidence that execution
+  stopped, never that it succeeded.
+- Cancel only execution this system started.
+- Deterministic first, then Jev, then the LLM. No endpoint was ever invented for an unidentified
+  service, which is why Jev was researched rather than stubbed.
+- LGPL-3.0, matching Baritone, which stays a separate and non-redistributed dependency.
 
 ## Unresolved
 
-Jev model/service identity, its API contract and latency budget; planner provider; supported gather
-item scope beyond direct block drops; exact 1.21.x target. None blocks the current prototype.
+- Which model is the planner, and its latency and cost budget.
+- Confidence thresholds for escalating from Jev to the planner. `docs/JEV.md` explains the mechanism;
+  the numbers must be tuned against real runs, not guessed.
+- How a task graph is represented and persisted across sessions.
+- Gather scope beyond direct block drops, which needs tool and drop rules.
+- The exact 1.21.x target.
 
-## Environment warning
+## Next agent: do these in order
 
-The `.git` directory at the workspace root is a stub containing only `info/`, so **this project is
-not under version control** and no work here is committed. Initialize a repository inside
-`Famulus/` before relying on history. `.gitignore` is already written for it.
+1. **Write the Jev client** as its own module with no Minecraft imports, against `docs/JEV.md`.
+   Include a fake for tests. Validate the returned `choice` against the action enum before dispatch;
+   treat it as untrusted input.
+2. **Put it above the existing engine** for one real decision, not the whole action set. The natural
+   first one is the milestone 2 boundary: with logs gathered and a chest nearby, choose between
+   `DEPOSIT_ITEM` and `COMPLETE_TASK`. Keep the call off-thread; it must not touch the tick loop.
+3. **Implement `DEPOSIT_ITEM`** so milestone 2, "collect 32 oak logs and put them in a chest", can
+   pass a client acceptance phase like milestone 1 did.
+4. **Exercise a recovery path in a real client** so the retry and timeout logic stops being the most
+   valuable untested part of the system. Breaking Baritone's path mid-task is the cheapest way in.
+5. Only then consider the LLM planner and the milestone 3 platform build.
+
+## Surprising things worth knowing
+
+- Jev does not appear in OpenRouter's `/api/v1/models` listing at all. 447 models, 61 providers,
+  zero mentions. Decision models seem to be excluded. Query the model URL directly.
+- The client game test passes completely and the gradle task still exits 248, because Baritone
+  strands non-daemon threads at shutdown. This is upstream. `BUGS.md` has the thread-dump proof.
+- `BariModel` was the old name. If you find that string anywhere outside `docs/acceptance/`, it is a
+  leftover and should be renamed. `Baritone` legitimately contains `Bari`; do not blanket-replace it.
+- Baritone's `mineByName` quantity is a **total inventory count**, not a count of blocks to mine.
+
+## Session log
+
+### 2026-09-19
+
+**Attempted:** continue an empty-session handover, verify milestone 1 in-client, name the project,
+publish it, and identify Jev.
+
+**Completed:** verified 42/42 engine tests and the real-client gather milestone, including the
+already-satisfied and stop paths. Traced the client test's exit 248 to Baritone's non-daemon threads
+via thread dump and proved Famulus creates no threads. Wrote `scripts/run-client-gametest.sh` to
+classify that failure narrowly, and rejected four doctored inputs to prove it is not vacuously green.
+Filled the empty `examples/` directory. Renamed BariModel to Famulus and re-ran the full client test
+to prove the rename did not break mod loading. Added LGPL-3.0 and pushed to a private repository.
+Located Jev, confirmed the endpoint and measured its latency, cost and decision quality.
+
+**Files modified:** every `.md`; all Java packages moved to `dev.famulus`; `FamulusClient` and
+`FamulusConfig` renamed; `scripts/run-client-gametest.sh`, `docs/ACCEPTANCE.md`, `docs/JEV.md`,
+`examples/` added; `LICENSE` and `LICENSE.GPL` added.
+
+**Tests:** `:core:test` 42 passed twice, before and after the rename. Client acceptance run twice,
+all assertions holding both times. Four negative tests against the acceptance classifier. Four live
+Jev calls plus three endpoint probes.
+
+**Problems:** Baritone's shutdown defect, documented and worked around rather than hidden. Jev's
+absence from the OpenRouter catalog made it look nonexistent until the model URL was queried
+directly.
+
+**Next action:** item 1 above, the Jev client module.
