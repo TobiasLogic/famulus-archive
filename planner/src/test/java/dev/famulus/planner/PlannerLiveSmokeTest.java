@@ -10,15 +10,6 @@ import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-/**
- * Asks a real model for a real plan. Skipped unless {@code OPENROUTER_API_KEY} is set.
- *
- * <p>Exists because {@link ChatPlannerTest} only proves the client agrees with replies written by
- * hand. Whether an actual model returns JSON this parser accepts is a different question, and the
- * only way to answer it is to ask one.
- *
- * <pre>OPENROUTER_API_KEY=... ./gradlew :planner:test --rerun-tasks</pre>
- */
 class PlannerLiveSmokeTest {
     private static final Set<String> GATHERABLE = Set.of(
             "minecraft:oak_log", "minecraft:spruce_log", "minecraft:birch_log",
@@ -52,8 +43,6 @@ class PlannerLiveSmokeTest {
 
     @Test
     void refusesToInventItemsItWasNotOffered() {
-        // Diamonds are not gatherable here. The model may propose them anyway; the parser must
-        // reject the plan rather than produce a task that would fail in the world.
         try {
             TaskPlan plan = planner().plan(new PlanRequest(
                     "Get me 5 diamonds and 3 iron ingots.",

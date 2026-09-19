@@ -6,7 +6,6 @@ import baritone.api.process.IBaritoneProcess;
 import dev.famulus.core.GatherExecutor;
 import dev.famulus.core.GatherTask;
 
-/** All calls are made on the Minecraft client thread, through Baritone's public API. */
 public final class BaritoneGatherExecutor implements GatherExecutor {
     private boolean ownsMining;
 
@@ -34,7 +33,7 @@ public final class BaritoneGatherExecutor implements GatherExecutor {
     @Override
     public void start(GatherTask task) {
         if (isBusy()) throw new IllegalStateException("Baritone is busy; stop its current task before gathering.");
-        // Mark ownership before calling: a partially started process still needs cancellation.
+
         ownsMining = true;
         baritone().getMineProcess().mineByName(task.targetCount(), task.blockId());
     }
@@ -48,7 +47,7 @@ public final class BaritoneGatherExecutor implements GatherExecutor {
         IBaritone api = baritone();
         boolean anotherProcessStarted = otherProcessActive(api);
         api.getMineProcess().cancel();
-        // A user may have replaced mining with another Baritone process. Leave that process alone.
+
         if (!anotherProcessStarted) api.getPathingBehavior().cancelEverything();
         ownsMining = false;
     }

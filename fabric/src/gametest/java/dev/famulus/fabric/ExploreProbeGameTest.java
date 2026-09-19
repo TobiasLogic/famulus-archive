@@ -7,23 +7,10 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.worldselection.WorldCreationUiState;
 import net.minecraft.world.item.Items;
 
-/**
- * Measures whether exploring makes a resource reachable that gathering alone cannot find.
- *
- * <p>A superflat world contains no sand at any distance, so sand is placed deliberately, far enough
- * away that it is outside the loaded area when the test begins. That is the only way to pose the
- * question honestly: "cannot find it" must mean "it is too far", not "it does not exist".
- *
- * <p>The control matters as much as the treatment. First a gather is attempted with a short budget
- * and must fail, proving the sand really is out of reach. Only then is exploring given a chance.
- *
- * <p>Opt-in, because it is slow and diagnostic:
- * <pre>FAMULUS_PROBE_EXPLORE=1 GRADLE_USER_HOME=.cache/gradle ./gradlew :fabric:runClientGameTest</pre>
- */
 @SuppressWarnings("UnstableApiUsage")
 public final class ExploreProbeGameTest implements FabricClientGameTest {
     private static final int GROUND_Y = -61;
-    /** Far enough to be outside the loaded area at spawn, near enough to reach in a few minutes. */
+
     private static final int SAND_DISTANCE = 260;
     private static final int CONTROL_TICKS = 600;
     private static final int EXPLORE_TICKS = 4800;
@@ -42,16 +29,13 @@ public final class ExploreProbeGameTest implements FabricClientGameTest {
             world.getServer().runCommand("clear @a");
             world.getServer().runCommand("give @a minecraft:diamond_shovel 1");
             world.getServer().runCommand("gamerule randomTickSpeed 0");
-            // A patch big enough that arriving anywhere near it is enough to gather from it.
+
             world.getServer().runCommand("fill " + SAND_DISTANCE + " " + (GROUND_Y + 1) + " "
                     + SAND_DISTANCE + " " + (SAND_DISTANCE + 15) + " " + (GROUND_Y + 1) + " "
                     + (SAND_DISTANCE + 15) + " minecraft:sand");
             context.waitTick();
             world.getConnection().waitForChunksRender();
 
-            // Positive control. Without this a zero at the end is ambiguous: it would look the same
-            // whether exploring failed to help or gathering sand never worked in the first place.
-            // Sand is placed within reach and must be collected.
             world.getServer().runCommand("fill 3 " + (GROUND_Y + 1) + " 3 6 "
                     + (GROUND_Y + 1) + " 6 minecraft:sand");
             context.waitTick();
@@ -69,13 +53,11 @@ public final class ExploreProbeGameTest implements FabricClientGameTest {
             world.getServer().runCommand("give @a minecraft:diamond_shovel 1");
             world.getServer().runCommand("fill 3 " + (GROUND_Y + 1) + " 3 6 "
                     + (GROUND_Y + 1) + " 6 minecraft:air");
-            // Dropped sand from the positive control would otherwise be picked up later and read as
-            // progress toward the distant patch.
+
             world.getServer().runCommand("kill @e[type=minecraft:item]");
             context.waitTick();
             world.getConnection().waitForClientboundPackets();
 
-            // Negative control: the distant sand must be genuinely out of reach to begin with.
             command(context, "/famulus queue minecraft:sand=8");
             int controlCount = waitForSand(context, CONTROL_TICKS);
             command(context, "/famulus stop");
@@ -88,12 +70,6 @@ public final class ExploreProbeGameTest implements FabricClientGameTest {
                         + SAND_DISTANCE + " blocks, so this probe proves nothing. Move it further.");
             }
 
-            // Treatment: explore, then try again.
-            // Exploring never finishes on its own; it runs until stopped. Bound it by time, which
-            // is exactly what FamulusAgent does with exploreTimeoutMillis.
-            //
-            // Distance travelled is recorded because without it a zero result cannot be read: it
-            // would not say whether exploring never engaged, or engaged and was simply too slow.
             context.runOnClient(client -> EXPLORER.start(client));
             context.waitTicks(20);
             boolean engaged = context.computeOnClient(client -> EXPLORER.isActive());
@@ -134,10 +110,6 @@ public final class ExploreProbeGameTest implements FabricClientGameTest {
         return context.computeOnClient(ExploreProbeGameTest::sandCount);
     }
 
-    /**
-     * Distance to the sand, not to spawn. Distance from spawn says only that the player went
-     * somewhere, and exploring is undirected, so somewhere is usually the wrong way.
-     */
     private static double distanceToSand(Minecraft client) {
         if (client.player == null) {
             return Double.MAX_VALUE;

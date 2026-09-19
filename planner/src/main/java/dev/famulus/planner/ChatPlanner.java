@@ -17,15 +17,6 @@ import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.util.Objects;
 
-/**
- * Asks a chat model for a plan, over the OpenAI style chat completions API.
- *
- * <p>Works against OpenRouter or a local server without changing anything but
- * {@link PlannerConfig}, because they speak the same shape.
- *
- * <p>Blocking, and slow enough that it must never touch the Minecraft client thread. Whatever comes
- * back is untrusted and goes through {@link PlanParser} before anything acts on it.
- */
 public final class ChatPlanner implements PlannerClient {
     private final PlannerConfig config;
     private final HttpClient http;
@@ -62,10 +53,6 @@ public final class ChatPlanner implements PlannerClient {
         return PlanParser.parse(content(response.body()), request.gatherableItems());
     }
 
-    /**
-     * The schema is stated in full, with a worked example, because a model given a vague shape
-     * invents fields. Anything it invents anyway is rejected by {@link PlanParser}.
-     */
     private String systemPrompt(PlanRequest request) {
         return """
                You plan tasks for a Minecraft agent. Reply with one JSON object and nothing else.
@@ -104,7 +91,7 @@ public final class ChatPlanner implements PlannerClient {
         JsonObject body = new JsonObject();
         body.addProperty("model", config.model());
         body.add("messages", messages);
-        // Planning should be repeatable rather than creative; the same world should plan the same way.
+
         body.addProperty("temperature", 0.2);
 
         HttpRequest.Builder builder = HttpRequest.newBuilder(URI.create(config.endpoint()))
@@ -112,7 +99,6 @@ public final class ChatPlanner implements PlannerClient {
                 .header("Content-Type", "application/json")
                 .POST(HttpRequest.BodyPublishers.ofString(body.toString(), StandardCharsets.UTF_8));
         if (config.hasKey()) {
-            // A local server usually rejects or ignores an Authorization header, so it is omitted.
             builder.header("Authorization", "Bearer " + config.apiKey());
         }
         return builder.build();
@@ -125,7 +111,6 @@ public final class ChatPlanner implements PlannerClient {
         return message;
     }
 
-    /** Pulls the assistant's text out of a chat completions response. */
     static String content(String body) throws PlannerException {
         JsonObject root;
         try {

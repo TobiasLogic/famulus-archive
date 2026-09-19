@@ -19,19 +19,7 @@ import java.util.EnumMap;
 import java.util.Map;
 import java.util.Objects;
 
-/**
- * Calls the Jev structured decision model. See docs/JEV.md for the verified wire contract.
- *
- * <p>Jev returns a typed choice constrained to the options it was given, so the valid action set is
- * enforced by the request rather than requested of a text model. This class still re-validates the
- * answer, because a response arriving over the network is untrusted input regardless of how the
- * model is meant to behave.
- *
- * <p>Blocking. Never call from the Minecraft client thread; median latency is around 0.78 seconds,
- * roughly fifteen ticks.
- */
 public final class JevClient implements PolicyClient {
-    /** Answer keys in the request. They appear verbatim in the response. */
     private static final String ACTION_QUESTION = "next_action";
     private static final String REPLAN_QUESTION = "needs_replan";
 
@@ -60,7 +48,6 @@ public final class JevClient implements PolicyClient {
             throw new PolicyException("Jev request was interrupted", interrupted);
         }
         if (response.statusCode() != 200) {
-            // Include the body: a 400 here is how the correct endpoint was originally discovered.
             throw new PolicyException("Jev returned HTTP " + response.statusCode() + ": "
                     + abbreviate(response.body()));
         }
@@ -84,7 +71,7 @@ public final class JevClient implements PolicyClient {
 
         JsonObject questions = new JsonObject();
         questions.add(ACTION_QUESTION, action);
-        // Asked in the same call rather than a second round trip; see the fan-out note in docs/JEV.md.
+
         questions.add(REPLAN_QUESTION, replan);
 
         JsonObject body = new JsonObject();
@@ -110,8 +97,6 @@ public final class JevClient implements PolicyClient {
                     + abbreviate(string(choice, "choice")));
         }
         if (!request.options().containsKey(action)) {
-            // The model is constrained by its option set, so this should be impossible. Check it
-            // anyway: acting on an action that was never offered is exactly the failure to prevent.
             throw new PolicyException("Jev returned " + action + ", which was not offered");
         }
 

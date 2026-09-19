@@ -3,22 +3,15 @@ package dev.famulus.core;
 import java.util.Objects;
 import java.util.regex.Pattern;
 
-/**
- * One step of a plan. Sealed, so every task type has an executor decided at compile time rather
- * than a string that might mean nothing by the time it is dispatched.
- */
 public sealed interface PlannedTask {
     Pattern RESOURCE_ID = Pattern.compile("[a-z0-9_.-]+:[a-z0-9/._-]+");
 
     String id();
 
-    /** The action that executes this task, used when offering choices to the policy layer. */
     AgentAction action();
 
-    /** One line for logs and the screen. */
     String describe();
 
-    /** Hold at least {@code count} of an item. Existing stacks count toward it. */
     record Gather(String id, String itemId, int count) implements PlannedTask {
         public Gather {
             requireId(id);
@@ -42,7 +35,6 @@ public sealed interface PlannedTask {
         }
     }
 
-    /** Build a named blueprint at the given origin. */
     record Build(String id, String blueprint, int originX, int originY, int originZ) implements PlannedTask {
         public Build {
             requireId(id);
@@ -63,7 +55,6 @@ public sealed interface PlannedTask {
         }
     }
 
-    /** Put items into a nearby container. */
     record Deposit(String id, String itemId, int count) implements PlannedTask {
         public Deposit {
             requireId(id);

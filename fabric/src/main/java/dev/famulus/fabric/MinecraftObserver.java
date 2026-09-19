@@ -11,16 +11,10 @@ import net.minecraft.resources.Identifier;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 
-/** Count the 36 main/hotbar slots, matching Baritone's quantity check. */
 public final class MinecraftObserver {
     private ClientLevel previousLevel;
     private long worldGeneration;
 
-    /**
-     * Counts several items in one inventory pass, for diffing a blueprint's material list.
-     * Unknown identifiers come back as zero rather than throwing, because the caller is usually
-     * working from a schematic that may name blocks this installation does not have.
-     */
     public static Map<String, Integer> countAll(Minecraft client, Collection<String> itemIds) {
         Map<String, Integer> counts = new LinkedHashMap<>();
         for (String itemId : itemIds) {
@@ -39,6 +33,17 @@ public final class MinecraftObserver {
             }
         }
         return counts;
+    }
+
+    public String worldKey(Minecraft client) {
+        if (client.level != previousLevel) {
+            previousLevel = client.level;
+            worldGeneration++;
+        }
+        if (client.level == null) {
+            return "disconnected";
+        }
+        return worldGeneration + ":" + client.level.dimension().identifier();
     }
 
     public WorldSnapshot observe(Minecraft client, String itemId) {

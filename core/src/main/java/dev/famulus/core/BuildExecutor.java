@@ -1,7 +1,7 @@
 package dev.famulus.core;
 
-public interface GatherExecutor {
-    void start(GatherTask task);
+public interface BuildExecutor {
+    void start(PlannedTask.Build task);
 
     void cancel();
 

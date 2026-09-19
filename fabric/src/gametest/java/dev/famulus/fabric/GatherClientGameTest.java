@@ -11,7 +11,6 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.block.Blocks;
 
-/** Exercises the shipped command and Baritone execution in a newly created test world. */
 @SuppressWarnings("UnstableApiUsage")
 public final class GatherClientGameTest implements FabricClientGameTest {
     private static final int TARGET = 32;
@@ -19,7 +18,6 @@ public final class GatherClientGameTest implements FabricClientGameTest {
 
     @Override
     public void runTest(ClientGameTestContext context) {
-        // Fabric's consistent defaults create a fresh flat world in the Gradle test run directory.
         try (TestSingleplayerContext world = context.worldBuilder()
                 .adjustSettings(settings -> settings.setGameMode(WorldCreationUiState.SelectedGameMode.SURVIVAL))
                 .create()) {
@@ -46,7 +44,6 @@ public final class GatherClientGameTest implements FabricClientGameTest {
             context.takeScreenshot("famulus-inventory-32-oak-logs");
             context.setScreen(() -> null);
 
-            // An available log must remain untouched when the requested inventory total is satisfied.
             BlockPos sentinel = new BlockPos(2, -60, 0);
             world.getServer().runCommand("setblock 2 -60 0 minecraft:oak_log");
             context.waitTick();
@@ -63,7 +60,6 @@ public final class GatherClientGameTest implements FabricClientGameTest {
             }
             context.takeScreenshot("famulus-already-satisfied");
 
-            // Start another real mining task, then use the public stop command and check it stays stopped.
             world.getServer().runCommand("fill 2 -60 2 9 -60 9 minecraft:oak_log");
             context.waitTick();
             world.getConnection().waitForClientboundPackets();
@@ -79,8 +75,6 @@ public final class GatherClientGameTest implements FabricClientGameTest {
             command(context, "/famulus status");
             context.takeScreenshot("famulus-stopped");
 
-            // A multi-task plan, which is the whole point of the agent: it must move to the second
-            // task by itself once the first is satisfied, with no further command.
             world.getServer().runCommand("clear @a");
             world.getServer().runCommand("give @a minecraft:diamond_axe 1");
             world.getServer().runCommand("give @a minecraft:diamond_shovel 1");
@@ -93,7 +87,7 @@ public final class GatherClientGameTest implements FabricClientGameTest {
             command(context, "/famulus queue minecraft:oak_log=8, minecraft:dirt=8");
             context.waitFor(client -> oakCount(client) >= 8, GATHER_TIMEOUT_TICKS);
             context.takeScreenshot("famulus-plan-first-task");
-            // Nothing else is sent: reaching the second task is the agent's own doing.
+
             context.waitFor(client -> dirtCount(client) >= 8, GATHER_TIMEOUT_TICKS);
             context.waitFor(client -> !isMining(), 400);
             context.runOnClient(client -> {
@@ -103,11 +97,6 @@ public final class GatherClientGameTest implements FabricClientGameTest {
             command(context, "/famulus status");
             context.takeScreenshot("famulus-plan-complete");
 
-            // The policy layer, exercised for real. The task must genuinely fail, and it must fail
-            // quickly: when a block type is absent entirely Baritone stays active searching and the
-            // engine only sees a 60s stall, three times over. Removing every log instead makes
-            // Baritone report that it cannot path to one, so the attempt ends in seconds.
-            // Skipped without a key, so ordinary runs stay offline and free.
             if (System.getenv("OPENROUTER_API_KEY") != null) {
                 world.getServer().runCommand("clear @a");
                 world.getServer().runCommand("give @a minecraft:diamond_axe 1");
@@ -126,8 +115,6 @@ public final class GatherClientGameTest implements FabricClientGameTest {
                 System.out.println("[FamulusPolicy] " + decision().orElse("no decision"));
             }
 
-            // The control panel. A compile proves nothing about a GUI, so open it and photograph
-            // every tab. Each screenshot is a chance to see a layout that silently went wrong.
             context.setScreen(FamulusClient::createScreen);
             context.waitTick();
             context.takeScreenshot("famulus-screen-agent");
@@ -160,7 +147,6 @@ public final class GatherClientGameTest implements FabricClientGameTest {
         return client.player.getInventory().countItem(Items.DIRT);
     }
 
-    /** True once the agent has recorded a policy answer. */
     private static boolean consulted() {
         return decision().isPresent();
     }

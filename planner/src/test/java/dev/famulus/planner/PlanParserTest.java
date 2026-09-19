@@ -102,11 +102,19 @@ class PlanParserTest {
         assertTrue(refuse("""
                 {"goal":"store","tasks":[{"type":"deposit","item":"minecraft:dirt","count":8}]}
                 """).getMessage().contains("not implemented"));
-        assertTrue(refuse("""
-                {"goal":"build","tasks":[{"type":"build","blueprint":"hut"}]}
-                """).getMessage().contains("not implemented"));
     }
 
+    @Test
+    void acceptsABuildNowThatItHasAnExecutor() throws Exception {
+        TaskPlan plan = parse("""
+                {"goal":"hut","tasks":[{"type":"build","blueprint":"hut.schem","x":1,"y":2,"z":3}]}
+                """);
+        PlannedTask.Build build = assertInstanceOf(PlannedTask.Build.class, plan.tasks().get(0));
+        assertEquals("hut.schem", build.blueprint());
+        assertEquals(1, build.originX());
+        assertEquals(2, build.originY());
+        assertEquals(3, build.originZ());
+    }
     @Test
     void refusesAnAbsurdCount() {
         PlannerException refused = refuse("""

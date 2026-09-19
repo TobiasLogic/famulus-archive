@@ -13,16 +13,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicReference;
 import net.minecraft.client.Minecraft;
 
-/**
- * Turns a sentence into a plan, off the client thread.
- *
- * <p>Planning takes seconds to tens of seconds, so it never runs inline. The screen starts a
- * request and then reads {@link #state()} and {@link #takePlan()} on later ticks.
- *
- * <p>The endpoint and model are configuration, not code, because every option worth having speaks
- * the same chat completions shape. A local server needs no key, which is why a missing key is only
- * an error for a remote one.
- */
 public final class PlannerService {
     private final CredentialStore credentials;
     private final ExecutorService worker;
@@ -36,7 +26,7 @@ public final class PlannerService {
         this.credentials = credentials;
         this.endpoint = endpoint;
         this.model = model;
-        // Daemon, so a pending plan can never stop the client from exiting.
+
         this.worker = Executors.newSingleThreadExecutor(runnable -> {
             Thread thread = new Thread(runnable, "Famulus-planner");
             thread.setDaemon(true);
@@ -56,7 +46,6 @@ public final class PlannerService {
         return busy;
     }
 
-    /** A line for the screen. Never contains the key. */
     public String state() {
         return state;
     }
@@ -67,15 +56,10 @@ public final class PlannerService {
         this.state = "set to " + this.model;
     }
 
-    /** Collects a finished plan exactly once. */
     public Optional<TaskPlan> takePlan() {
         return Optional.ofNullable(ready.getAndSet(null));
     }
 
-    /**
-     * Starts a planning request. Returns false if one is already running, so a second click cannot
-     * queue up a duplicate.
-     */
     public boolean request(String goal, Minecraft client) {
         if (busy) {
             return false;
@@ -117,7 +101,6 @@ public final class PlannerService {
         return new PlannerConfig(endpoint, model, key, Duration.ofSeconds(local ? 180 : 90));
     }
 
-    /** Brief, because the planner is billed by input and a long dump helps nobody. */
     private static String describeWorld(Minecraft client) {
         if (client.player == null || client.level == null) {
             return "Not in a world.";

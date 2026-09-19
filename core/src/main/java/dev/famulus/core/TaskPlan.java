@@ -5,11 +5,6 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 
-/**
- * An ordered plan. Whether it came from a blueprint's material list or an LLM, it is validated the
- * same way before anything runs: a plan is untrusted input until its ids are unique and every task
- * has an executor.
- */
 public record TaskPlan(String goal, List<PlannedTask> tasks) {
     public TaskPlan {
         Objects.requireNonNull(goal, "goal");
@@ -30,10 +25,6 @@ public record TaskPlan(String goal, List<PlannedTask> tasks) {
         tasks = List.copyOf(tasks);
     }
 
-    /**
-     * Tasks whose action has no executor yet. A plan containing any of these must be refused with
-     * an explanation rather than started and abandoned partway.
-     */
     public List<PlannedTask> unexecutable() {
         return tasks.stream().filter(task -> !task.action().isExecutable()).toList();
     }

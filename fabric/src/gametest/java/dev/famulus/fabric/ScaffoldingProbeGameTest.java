@@ -13,30 +13,12 @@ import net.minecraft.core.Vec3i;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 
-/**
- * Measures whether Baritone can build a structure that is not resting on the ground.
- *
- * <p>Placing a block in vanilla Minecraft requires an existing face to place against, so a position
- * with no solid neighbour cannot be filled without first placing a temporary supporting block.
- * Baritone 1.19.0 exposes no scaffolding setting; the closest are {@code buildInLayers} and
- * {@code skipFailedLayers}, the latter existing because layers do fail. This probe establishes what
- * actually happens rather than inferring it from setting names.
- *
- * <p>Two identical 3x3 platforms are built. The control rests directly on the ground and proves the
- * harness, the inventory and Baritone's builder all work. The floating one sits five blocks up with
- * nothing beneath it. A difference between them isolates the scaffolding behaviour; both failing
- * would mean the probe itself is wrong.
- *
- * <p>Opt-in, because it costs several minutes and is a diagnostic rather than an acceptance test:
- * <pre>FAMULUS_PROBE_SCAFFOLDING=1 ./gradlew :fabric:runClientGameTest</pre>
- */
 @SuppressWarnings("UnstableApiUsage")
 public final class ScaffoldingProbeGameTest implements FabricClientGameTest {
     private static final int GROUND_Y = -61;
     private static final int BUILD_TIMEOUT_TICKS = 2400;
     private static final int SIZE = 3;
 
-    /** A solid platform, one block thick. Every position is cobblestone, so no air handling. */
     private record Platform(BlockState block) implements ISchematic {
         @Override
         public BlockState desiredState(int x, int y, int z, BlockState current, List<BlockState> placeable) {
@@ -75,11 +57,9 @@ public final class ScaffoldingProbeGameTest implements FabricClientGameTest {
             context.waitTick();
             world.getConnection().waitForChunksRender();
 
-            // Control: resting on the ground, every block placeable against the terrain.
             BlockPos grounded = new BlockPos(6, GROUND_Y + 1, 6);
             int groundedPlaced = attempt(context, "grounded", grounded);
 
-            // Treatment: five blocks up, no solid neighbour anywhere in the schematic.
             BlockPos floating = new BlockPos(-6, GROUND_Y + 6, -6);
             int floatingPlaced = attempt(context, "floating", floating);
 
@@ -90,14 +70,12 @@ public final class ScaffoldingProbeGameTest implements FabricClientGameTest {
                     + countSupportColumn(context, floating));
 
             if (groundedPlaced < total) {
-                // Without a working control the floating number means nothing.
                 throw new AssertionError("Control build failed (" + groundedPlaced + "/" + total
                         + "); the probe cannot conclude anything about scaffolding");
             }
         }
     }
 
-    /** Runs one build to completion or timeout and returns how many blocks actually exist. */
     private static int attempt(ClientGameTestContext context, String label, BlockPos origin) {
         context.runOnClient(client -> BaritoneAPI.getProvider().getPrimaryBaritone()
                 .getBuilderProcess()
@@ -134,7 +112,6 @@ public final class ScaffoldingProbeGameTest implements FabricClientGameTest {
         return found;
     }
 
-    /** Blocks left in the column beneath the floating build, which is how a pillar shows up. */
     private static int countSupportColumn(ClientGameTestContext context, BlockPos origin) {
         return context.computeOnClient(client -> {
             int found = 0;

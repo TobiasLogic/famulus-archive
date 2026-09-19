@@ -83,6 +83,11 @@ public final class FamulusClient implements ClientModInitializer {
                                 .then(argument("spec", StringArgumentType.greedyString())
                                         .executes(context -> queue(context.getSource(),
                                                 StringArgumentType.getString(context, "spec")))))
+                        .then(literal("build")
+                                .then(argument("schematic", StringArgumentType.string())
+                                        .suggests(FamulusClient::suggestSchematics)
+                                        .executes(context -> build(context.getSource(),
+                                                StringArgumentType.getString(context, "schematic")))))
                         .then(literal("collect")
                                 .then(argument("schematic", StringArgumentType.string())
                                         .suggests(FamulusClient::suggestSchematics)
@@ -111,11 +116,6 @@ public final class FamulusClient implements ClientModInitializer {
                 String.join(", ", SchematicAnalyzer.supportedExtensions()));
     }
 
-    /**
-     * The control panel, or null before the mod has initialised. Used by the keybind and by the
-     * client test, and available for a mod menu integration later.
-     */
-    /** The live agent, or null before initialisation. Used by the client test to observe decisions. */
     public static FamulusAgent agent() {
         return instance == null ? null : instance.agent;
     }
@@ -159,7 +159,6 @@ public final class FamulusClient implements ClientModInitializer {
 
     private void tick(Minecraft client) {
         if (openScreen != null && agent != null) {
-            // Key mappings do not fire while a screen is open, so no open-screen check is needed.
             while (openScreen.consumeClick()) {
                 client.setScreenAndShow(new FamulusScreen(agent, credentials, planner, 0));
             }
@@ -183,7 +182,6 @@ public final class FamulusClient implements ClientModInitializer {
                 if (client.player != null) client.player.sendSystemMessage(Component.literal(format(result)));
             }
         } catch (RuntimeException e) {
-            // Observation/integration exceptions also stop owned movement instead of escaping every tick.
             controller.stop("Minecraft observation failed: " + e.getMessage());
             LOGGER.error("Gather stopped after integration failure", e);
         }
@@ -210,12 +208,10 @@ public final class FamulusClient implements ClientModInitializer {
                     .filter(name -> name.toLowerCase().startsWith(builder.getRemainingLowerCase().replace("\"", "")))
                     .forEach(name -> builder.suggest('"' + name + '"'));
         } catch (Exception ignored) {
-            // Suggestions are a convenience; a missing directory must not break the command.
         }
         return builder.buildFuture();
     }
 
-    /** Parses a blueprint and reports what it needs against what is held. Changes nothing. */
     private int materials(FabricClientCommandSource source, String schematic) {
         if (!ready(source)) return 0;
         Minecraft client = Minecraft.getInstance();
@@ -244,13 +240,6 @@ public final class FamulusClient implements ClientModInitializer {
         return 1;
     }
 
-    /**
-     * Queues several gather tasks from a spec such as
-     * {@code minecraft:oak_log=32, minecraft:dirt=16}, and runs them as one plan.
-     *
-     * <p>Counts are inventory totals, matching {@code /famulus gather}. This is the schematic flow
-     * without needing a blueprint file, and it is what the plan gametest drives.
-     */
     private int queue(FabricClientCommandSource source, String spec) {
         if (!ready(source)) return 0;
         Minecraft client = Minecraft.getInstance();
@@ -297,7 +286,31 @@ public final class FamulusClient implements ClientModInitializer {
         return 1;
     }
 
-    /** Builds a gather plan from a blueprint's shortfall and runs it autonomously. */
+    private int build(FabricClientCommandSource source, String schematic) {
+        if (!ready(source)) return 0;
+        Minecraft client = Minecraft.getInstance();
+        if (client.player == null || client.level == null) return error(source, "Join a world first.");
+        if (client.player.gameMode() != GameType.SURVIVAL) {
+            return error(source, "Building requires survival mode.");
+        }
+        if (agent.isRunning() || controller.isRunning()) {
+            return error(source, "Something is already running. Use /famulus stop first.");
+        }
+        var origin = client.player.blockPosition();
+        try {
+            SchematicSummary summary =
+                    SchematicAnalyzer.analyze(SchematicAnalyzer.schematicDirectory().resolve(schematic));
+            agent.start(new TaskPlan("build " + summary.name(), List.of(
+                    new PlannedTask.Build("b1", schematic,
+                            origin.getX(), origin.getY(), origin.getZ()))));
+            source.sendFeedback(Component.literal("[Famulus] building " + summary.name() + " "
+                    + summary.dimensions() + " at " + origin.toShortString()));
+        } catch (Exception failure) {
+            return error(source, failure.getMessage());
+        }
+        return 1;
+    }
+
     private int collect(FabricClientCommandSource source, String schematic) {
         if (!ready(source)) return 0;
         Minecraft client = Minecraft.getInstance();

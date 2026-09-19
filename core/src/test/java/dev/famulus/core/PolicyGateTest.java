@@ -68,10 +68,10 @@ class PolicyGateTest {
     void anActionWithoutAnExecutorIsNeverDispatched() {
         Map<AgentAction, String> options = new LinkedHashMap<>();
         options.put(AgentAction.GATHER, "Keep gathering");
-        options.put(AgentAction.BUILD, "Build the structure");
+        options.put(AgentAction.DEPOSIT_ITEM, "Put items in a chest");
         PolicyRequest offered = new PolicyRequest("state", options);
-        PolicyGate gate = gate(r -> decision(AgentAction.BUILD, 0.99, 0.0));
-        assertFalse(AgentAction.BUILD.isExecutable());
+        PolicyGate gate = gate(r -> decision(AgentAction.DEPOSIT_ITEM, 0.99, 0.0));
+        assertFalse(AgentAction.DEPOSIT_ITEM.isExecutable());
         assertEquals(AgentAction.REQUEST_REPLAN, gate.next(offered));
         assertTrue(gate.lastReason().contains("No executor"));
     }
@@ -128,7 +128,7 @@ class PolicyGateTest {
     @Test
     void fallbackMustBeExecutableBecauseItIsUsedWhenNothingElseWorks() {
         assertThrows(IllegalArgumentException.class,
-                () -> new PolicyGate(r -> decision(AgentAction.GATHER, 1, 0), CONFIG, AgentAction.BUILD));
+                () -> new PolicyGate(r -> decision(AgentAction.GATHER, 1, 0), CONFIG, AgentAction.DEPOSIT_ITEM));
     }
 
     @Test

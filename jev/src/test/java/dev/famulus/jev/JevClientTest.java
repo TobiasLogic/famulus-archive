@@ -21,12 +21,6 @@ import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-/**
- * Exercises the real wire path against a local HTTP server, so request construction and response
- * parsing are tested without network access or spending anything.
- *
- * <p>The canned response bodies are copied from a genuine Jev reply recorded in docs/JEV.md.
- */
 class JevClientTest {
     private HttpServer server;
     private final AtomicReference<String> lastRequestBody = new AtomicReference<>();

@@ -4,19 +4,6 @@ import java.time.Duration;
 import java.util.List;
 import java.util.Objects;
 
-/**
- * Where the planner lives and which model answers.
- *
- * <p>Deliberately just a base URL, a model id and an optional key, because every option worth having
- * speaks the same OpenAI style chat completions shape. OpenRouter, Ollama, llama.cpp's server and
- * LM Studio all work through the same two fields, so choosing a model is configuration rather than
- * code, and a local model needs no key at all.
- *
- * @param endpoint full chat completions URL
- * @param model    model identifier as the endpoint expects it
- * @param apiKey   bearer token, or blank for a local server that wants none
- * @param timeout  per request; planning is slow, so this is generous compared with the policy layer
- */
 public record PlannerConfig(String endpoint, String model, String apiKey, Duration timeout) {
     public static final String OPENROUTER = "https://openrouter.ai/api/v1/chat/completions";
     public static final String OLLAMA = "http://localhost:11434/v1/chat/completions";
@@ -25,10 +12,6 @@ public record PlannerConfig(String endpoint, String model, String apiKey, Durati
 
     public static final String DEFAULT_MODEL = "deepseek/deepseek-v4.1-flash";
 
-    /**
-     * Suggestions for the model selector. Not a restriction: any model id the endpoint accepts
-     * works, and this list exists only so the field does not start empty and unguessable.
-     */
     public static List<String> suggestedModels() {
         return List.of(
                 "deepseek/deepseek-v4.1-flash",
@@ -40,7 +23,6 @@ public record PlannerConfig(String endpoint, String model, String apiKey, Durati
                 "qwen/qwen3-max");
     }
 
-    /** Endpoint presets for the selector, paired with a label. */
     public static List<String> suggestedEndpoints() {
         return List.of(OPENROUTER, OLLAMA, LLAMA_CPP, LM_STUDIO);
     }
@@ -68,12 +50,10 @@ public record PlannerConfig(String endpoint, String model, String apiKey, Durati
         return new PlannerConfig(OPENROUTER, model, apiKey, Duration.ofSeconds(90));
     }
 
-    /** A local server, which needs no key. */
     public static PlannerConfig local(String endpoint, String model) {
         return new PlannerConfig(endpoint, model, "", Duration.ofSeconds(180));
     }
 
-    /** True when this configuration is talking to something on this machine. */
     public boolean isLocal() {
         return endpoint.contains("localhost") || endpoint.contains("127.0.0.1");
     }

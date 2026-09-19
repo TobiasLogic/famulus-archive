@@ -12,28 +12,13 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 
-/**
- * Turns a model's reply into a validated {@link TaskPlan}, or refuses.
- *
- * <p>This is the security boundary of the planning layer. Everything arriving here is untrusted
- * text produced by a language model: it may be malformed, may name blocks that do not exist, may ask
- * for a million of something, and may wrap its answer in prose or markdown. A plan is either fully
- * valid or rejected with a reason. There is no partial acceptance, because a half-understood plan
- * executed in someone's world is worse than no plan.
- */
 public final class PlanParser {
-    /** Enough for a large blueprint's material list, small enough that nothing runs away. */
     public static final int MAX_TASKS = 40;
-    /** One inventory. Beyond this there is nowhere to put the items; see docs/CONTAINERS.md. */
+
     public static final int MAX_COUNT = 2304;
 
     private PlanParser() {}
 
-    /**
-     * @param raw        the model's reply, possibly with prose or code fences around the JSON
-     * @param gatherable namespaced items the gather layer can actually obtain
-     * @throws PlannerException with a message fit to show the user
-     */
     public static TaskPlan parse(String raw, Set<String> gatherable) throws PlannerException {
         JsonObject root = readObject(raw);
 
@@ -87,7 +72,6 @@ public final class PlanParser {
                                         List<String> rejected) throws PlannerException {
         String id = string(task, "id");
         if (id == null || id.isBlank()) {
-            // Models often omit ids. That is not worth failing a whole plan over.
             id = "t" + (index + 1);
         }
         String type = string(task, "type");
@@ -101,8 +85,7 @@ public final class PlanParser {
                 int count = requireCount(task, index);
                 if (!gatherable.contains(item)) {
                     rejected.add(item);
-                    // Recorded rather than thrown, so the user is told about every unobtainable
-                    // item at once instead of discovering them one failed plan at a time.
+
                     yield new PlannedTask.Gather(id, item, count);
                 }
                 yield new PlannedTask.Gather(id, item, count);
@@ -128,7 +111,7 @@ public final class PlanParser {
             throw new PlannerException("Task " + (index + 1) + " names no item.");
         }
         item = item.trim().toLowerCase(java.util.Locale.ROOT);
-        // Models frequently drop the namespace. Assuming vanilla is safe and saves a rejection.
+
         if (!item.contains(":")) {
             item = "minecraft:" + item;
         }
@@ -150,10 +133,6 @@ public final class PlanParser {
         return count;
     }
 
-    /**
-     * Finds the JSON object in a reply. Models wrap answers in code fences and commentary even when
-     * asked not to, so the outermost braces are located rather than trusting the whole string.
-     */
     private static JsonObject readObject(String raw) throws PlannerException {
         if (raw == null || raw.isBlank()) {
             throw new PlannerException("The planner returned nothing.");
@@ -188,7 +167,6 @@ public final class PlanParser {
             return fallback;
         }
         try {
-            // Models write counts as "32" and as 32.0 about as often as they write 32.
             return (int) Math.round(value.getAsDouble());
         } catch (NumberFormatException notANumber) {
             return fallback;

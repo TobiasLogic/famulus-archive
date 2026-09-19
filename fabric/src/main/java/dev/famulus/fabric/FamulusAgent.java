@@ -2,6 +2,8 @@ package dev.famulus.fabric;
 
 import dev.famulus.core.AgentAction;
 import dev.famulus.core.GatherConfig;
+import dev.famulus.core.BuildController;
+import dev.famulus.core.BuildSnapshot;
 import dev.famulus.core.GatherController;
 import dev.famulus.core.GatherTask;
 import dev.famulus.core.PlanRunner;
@@ -28,34 +30,22 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicReference;
 import net.minecraft.client.Minecraft;
 
-/**
- * Runs a whole plan: drives each task through the deterministic engine, and consults the policy
- * layer when a task fails.
- *
- * <p>All state here is touched only from the Minecraft client thread. The single exception is
- * {@link #pendingDecision}, which a worker thread writes once per policy call and the client thread
- * reads. Nothing else crosses the boundary, which is what keeps a network call out of the tick loop
- * without needing locks.
- */
 public final class FamulusAgent {
-    /** Kept short so a wedged policy call cannot stall a plan indefinitely. */
     private static final int POLICY_TIMEOUT_TICKS = 300;
 
     private final GatherController gather;
+    private final BuildController builder;
+    private final BaritoneBuildExecutor buildExecutor = new BaritoneBuildExecutor();
     private final BaritoneExplorer explorer = new BaritoneExplorer();
     private final long exploreTimeoutMillis;
     private final PolicyGate gate;
     private final CredentialStore credentials;
     private final ExecutorService policyThread;
-    /** Swapped when a key is saved, so a new key takes effect without restarting Minecraft. */
+
     private final AtomicReference<PolicyClient> policyClient = new AtomicReference<>();
     private volatile String policyState = "not configured";
     private final Deque<String> log = new ArrayDeque<>();
 
-    /**
-     * A decision tagged with the request it answers. Without the tag, an answer that arrived after
-     * its request timed out would be applied to whatever situation came next.
-     */
     private record Answer(long generation, AgentAction action) {}
 
     private final AtomicReference<Answer> pendingDecision = new AtomicReference<>();
@@ -70,15 +60,14 @@ public final class FamulusAgent {
     public FamulusAgent(GatherConfig gatherConfig, PolicyGateConfig policyConfig,
                         CredentialStore credentials, long exploreTimeoutMillis) {
         this.gather = new GatherController(new BaritoneGatherExecutor(), gatherConfig);
+        this.builder = new BuildController(buildExecutor, gatherConfig);
         this.exploreTimeoutMillis = exploreTimeoutMillis;
         this.credentials = credentials;
         reloadPolicy();
-        // The gate holds a stable delegate, so reloading a key never has to rebuild the gate and
-        // lose its escalation counter mid-plan.
+
         this.gate = new PolicyGate(request -> policyClient.get().decide(request),
                 policyConfig, AgentAction.RECOVER);
-        // Daemon threads on purpose: Baritone's own non-daemon pool is why the client cannot exit
-        // cleanly (see BUGS.md), and this project will not add a second instance of that bug.
+
         this.policyThread = Executors.newSingleThreadExecutor(runnable -> {
             Thread thread = new Thread(runnable, "Famulus-policy");
             thread.setDaemon(true);
@@ -86,10 +75,6 @@ public final class FamulusAgent {
         });
     }
 
-    /**
-     * Rebuilds the policy client from the stored or environment key. Safe to call at any time; a
-     * plan in progress keeps running either way, because an unconfigured policy just falls back.
-     */
     public void reloadPolicy() {
         String key = credentials.resolve().orElse(null);
         if (key == null || key.isBlank()) {
@@ -109,7 +94,6 @@ public final class FamulusAgent {
         return credentials.resolve().isPresent();
     }
 
-    /** A line for the Settings tab. Contains a masked key, never a usable one. */
     public String policyState() {
         return policyState;
     }
@@ -118,7 +102,6 @@ public final class FamulusAgent {
         return runner != null && !runner.step().isTerminal() && runner.step() != PlanStep.NOT_STARTED;
     }
 
-    /** @throws IllegalStateException if a plan is already running, or the plan cannot be executed */
     public void start(TaskPlan plan) {
         if (isRunning()) {
             throw new IllegalStateException("A plan is already running. Use /famulus stop first.");
@@ -149,9 +132,11 @@ public final class FamulusAgent {
 
     private void runCurrent(Minecraft client, long nowMillis) {
         PlannedTask task = runner.current();
+        if (task instanceof PlannedTask.Build buildTask) {
+            runBuild(client, nowMillis, buildTask);
+            return;
+        }
         if (!(task instanceof PlannedTask.Gather gatherTask)) {
-            // PlanRunner refuses unexecutable plans, so this means a task type gained an action
-            // before it gained an executor here.
             finishTask(new TaskResult(TaskStatus.INVALID_TARGET,
                     "No executor for " + task.describe(), 0, 0, 0));
             return;
@@ -177,10 +162,6 @@ public final class FamulusAgent {
         }
     }
 
-    /**
-     * Ranges outward for a bounded time, then retries the task regardless of what was found.
-     * The inventory decides success, so there is nothing to check here beyond the clock.
-     */
     private void explore(Minecraft client, long nowMillis) {
         if (!exploring) {
             exploring = true;
@@ -205,6 +186,42 @@ public final class FamulusAgent {
             note(summary);
             runner.onExploreComplete(summary);
         }
+    }
+
+    private void runBuild(Minecraft client, long nowMillis, PlannedTask.Build buildTask) {
+        if (!taskStarted) {
+            taskStarted = true;
+            note("running " + buildTask.describe());
+            try {
+                buildExecutor.load(buildTask);
+            } catch (Exception unreadable) {
+                finishTask(new TaskResult(TaskStatus.INVALID_TARGET, unreadable.getMessage(), 0, 0, 0));
+                return;
+            }
+            try {
+                builder.start(buildTask, observeBuild(client), nowMillis);
+            } catch (RuntimeException failure) {
+                finishTask(new TaskResult(TaskStatus.FAILED,
+                        "Could not start: " + failure.getMessage(), 0, 0, 0));
+                return;
+            }
+        } else {
+            builder.tick(observeBuild(client), nowMillis);
+        }
+        if (!builder.isRunning()) {
+            finishTask(builder.result());
+        }
+    }
+
+    private BuildSnapshot observeBuild(Minecraft client) {
+        if (client.level == null || client.player == null) {
+            return new BuildSnapshot(false, false, "disconnected", 0, 0, false);
+        }
+        SchematicAnalyzer.Progress progress =
+                SchematicAnalyzer.measure(client, buildExecutor.schematic(), buildExecutor.origin());
+        String worldKey = FamulusClient.OBSERVER.worldKey(client);
+        return new BuildSnapshot(true, client.player.isAlive() && !client.player.isRemoved(),
+                worldKey, progress.remaining(), progress.total(), progress.hasMaterials());
     }
 
     private void finishTask(TaskResult result) {
@@ -233,13 +250,11 @@ public final class FamulusAgent {
             long generation = ++policyGeneration;
             PolicyRequest request = new PolicyRequest(
                     describeSituation(client), runner.policyOptions());
-            // The gate never throws, so the worker always produces an action and the plan never
-            // wedges waiting for a reply that is not coming.
+
             policyThread.execute(() -> pendingDecision.set(new Answer(generation, gate.next(request))));
             return;
         }
         if (++policyWaitTicks > POLICY_TIMEOUT_TICKS) {
-            // Bump the generation so the abandoned request's answer is discarded when it lands.
             policyGeneration++;
             policyDispatched = false;
             note("policy did not answer in time; retrying the task");
@@ -247,7 +262,6 @@ public final class FamulusAgent {
         }
     }
 
-    /** The state string handed to the policy. Kept compact: cost is driven by input tokens. */
     private String describeSituation(Minecraft client) {
         TaskResult last = gather.result();
         StringBuilder text = new StringBuilder(256);
@@ -274,6 +288,7 @@ public final class FamulusAgent {
 
     public void stop(String reason) {
         gather.stop(reason);
+        builder.stop(reason);
         if (exploring) {
             explorer.cancel();
             exploring = false;
@@ -297,7 +312,6 @@ public final class FamulusAgent {
         return runner;
     }
 
-    /** Most recent events, newest last, for the status command and the screen. */
     public List<String> recentLog() {
         return List.copyOf(log);
     }

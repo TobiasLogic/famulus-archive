@@ -1,6 +1,5 @@
 package dev.famulus.core;
 
-/** worldKey identifies both a connection session and its dimension. */
 public record WorldSnapshot(boolean connected, boolean alive, String worldKey,
                             int itemCount, boolean inventoryHasSpace) {
     public WorldSnapshot {

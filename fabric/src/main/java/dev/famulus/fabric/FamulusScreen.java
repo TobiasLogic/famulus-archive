@@ -21,13 +21,6 @@ import net.minecraft.client.gui.navigation.ScreenRectangle;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 
-/**
- * The in-game control panel.
- *
- * <p>Built entirely from widgets. Minecraft 26.2 replaced immediate-mode drawing with render-state
- * extraction and {@code GuiGraphics} no longer has text methods at all, so every line on screen is a
- * {@link StringWidget} whose message is refreshed in {@link #tick()}.
- */
 public final class FamulusScreen extends Screen {
     private static final int TAB_BAR_HEIGHT = 24;
     private static final int ROW_WIDTH = 380;
@@ -48,7 +41,6 @@ public final class FamulusScreen extends Screen {
 
     private final int initialTab;
 
-    /** {@code initialTab} lets the client test photograph each tab without simulating clicks. */
     public FamulusScreen(FamulusAgent agent, CredentialStore credentials,
                          PlannerService planner, int initialTab) {
         super(Component.literal("Famulus"));
@@ -100,7 +92,6 @@ public final class FamulusScreen extends Screen {
         }
     }
 
-    /** Fits a line to the panel so a long message cannot spill outside it. */
     private static Component row(String text) {
         String trimmed = text == null ? "" : text;
         return Component.literal(trimmed.length() <= 58 ? trimmed : trimmed.substring(0, 55) + "...");
@@ -112,7 +103,6 @@ public final class FamulusScreen extends Screen {
         return widget;
     }
 
-    /** What the agent is doing, and why. */
     private final class AgentTab extends GridLayoutTab {
         private final StringWidget status;
         private final StringWidget policy;
@@ -144,7 +134,6 @@ public final class FamulusScreen extends Screen {
         }
     }
 
-    /** Ask for something in plain language, see the plan it produces, then run it. */
     private final class ChatTab extends GridLayoutTab {
         private final EditBox goalField;
         private final StringWidget status;
@@ -206,7 +195,6 @@ public final class FamulusScreen extends Screen {
         }
 
         void refresh() {
-            // A finished plan is collected once, then held until the user chooses to run it.
             planner.takePlan().ifPresent(plan -> {
                 pending = plan;
                 runButton.active = true;
@@ -226,7 +214,6 @@ public final class FamulusScreen extends Screen {
         }
     }
 
-    /** Blueprints, their material shortfall, and starting a collection run. */
     private final class BuildTab extends GridLayoutTab {
         private final StringWidget selection;
         private final StringWidget summary;
@@ -353,7 +340,6 @@ public final class FamulusScreen extends Screen {
         }
     }
 
-    /** Credentials and how confidently the policy must answer before it is obeyed. */
     private final class SettingsTab extends GridLayoutTab {
         private final EditBox keyField;
         private final StringWidget keyStatus;
@@ -415,7 +401,7 @@ public final class FamulusScreen extends Screen {
             }
             try {
                 credentials.save(typed);
-                // Clear immediately: a key left in a text box is a key on someone's stream.
+
                 keyField.setValue("");
                 agent.reloadPolicy();
                 note.setMessage(row("saved; policy reloaded"));

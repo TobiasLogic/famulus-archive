@@ -12,17 +12,6 @@ import java.util.Optional;
 import java.util.Properties;
 import java.util.Set;
 
-/**
- * Reads and writes the API key, kept in its own file away from ordinary settings.
- *
- * <p>Separate on purpose. Settings get pasted into bug reports and screenshots; credentials should
- * not travel with them. The file is created with owner-only permissions where the filesystem
- * supports it, and nothing here ever writes a key to a log.
- *
- * <p>The environment variable wins over the stored file. That keeps a temporary key usable for one
- * session without overwriting the saved one, and lets tests and CI supply a key without touching
- * the user's disk.
- */
 public final class CredentialStore {
     public static final String FILE_NAME = "credentials.properties";
     private static final String KEY_PROPERTY = "openrouter.api.key";
@@ -36,7 +25,6 @@ public final class CredentialStore {
         this.file = Objects.requireNonNull(directory, "directory").resolve(FILE_NAME);
     }
 
-    /** The key to use: the environment first, then the stored file. Empty when neither is set. */
     public Optional<String> resolve() {
         String fromEnvironment = System.getenv(JevConfig.API_KEY_VARIABLE);
         if (fromEnvironment != null && !fromEnvironment.isBlank()) {
@@ -45,7 +33,6 @@ public final class CredentialStore {
         return stored();
     }
 
-    /** Only what is on disk, ignoring the environment. Used to show what would be cleared. */
     public Optional<String> stored() {
         if (!Files.isRegularFile(file)) {
             return Optional.empty();
@@ -54,7 +41,6 @@ public final class CredentialStore {
         try (Reader reader = Files.newBufferedReader(file)) {
             values.load(reader);
         } catch (IOException unreadable) {
-            // An unreadable credentials file must not stop the mod from loading.
             return Optional.empty();
         }
         String stored = values.getProperty(KEY_PROPERTY, "").trim();
@@ -66,12 +52,6 @@ public final class CredentialStore {
         return fromEnvironment != null && !fromEnvironment.isBlank();
     }
 
-    /**
-     * Writes the key, replacing any previous one.
-     *
-     * @throws IOException if the file cannot be written; the caller must surface this rather than
-     *                     leaving the user believing a key was saved
-     */
     public void save(String apiKey) throws IOException {
         Objects.requireNonNull(apiKey, "apiKey");
         String trimmed = apiKey.trim();
@@ -81,8 +61,7 @@ public final class CredentialStore {
         Files.createDirectories(file.getParent());
         Properties values = new Properties();
         values.setProperty(KEY_PROPERTY, trimmed);
-        // Create with restrictive permissions before writing, so the secret is never briefly
-        // world readable between creation and the permission change.
+
         if (!Files.exists(file)) {
             Files.createFile(file);
         }
@@ -93,7 +72,6 @@ public final class CredentialStore {
         restrictPermissions();
     }
 
-    /** Removes the stored key. Succeeds whether or not one was present. */
     public void clear() throws IOException {
         Files.deleteIfExists(file);
     }
@@ -108,15 +86,9 @@ public final class CredentialStore {
                     EnumSet.of(PosixFilePermission.OWNER_READ, PosixFilePermission.OWNER_WRITE);
             Files.setPosixFilePermissions(file, ownerOnly);
         } catch (UnsupportedOperationException | IOException notPosix) {
-            // Windows and some filesystems have no POSIX permissions. Saving still works; the file
-            // simply relies on the directory's own protection.
         }
     }
 
-    /**
-     * A form safe to show on screen and in logs: enough to recognise which key is stored, never
-     * enough to use it.
-     */
     public static String mask(String apiKey) {
         if (apiKey == null || apiKey.isBlank()) {
             return "not set";

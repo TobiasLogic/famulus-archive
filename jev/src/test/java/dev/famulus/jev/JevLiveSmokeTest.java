@@ -12,16 +12,6 @@ import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-/**
- * Calls the real Jev API. Skipped unless {@code OPENROUTER_API_KEY} is set, so ordinary builds stay
- * offline, free and deterministic.
- *
- * <p>This exists because {@link JevClientTest} only proves the client agrees with canned responses
- * written by hand. If the live contract changes, only this test notices. A call costs about
- * $0.000026.
- *
- * <pre>OPENROUTER_API_KEY=... ./gradlew :jev:test --rerun-tasks</pre>
- */
 class JevLiveSmokeTest {
     private static JevClient liveClient() {
         String key = System.getenv(JevConfig.API_KEY_VARIABLE);
@@ -50,14 +40,12 @@ class JevLiveSmokeTest {
 
         PolicyDecision decision = liveClient().decide(request);
 
-        // The point is the contract, not the exact answer, so assert only what must always hold.
         assertTrue(options.containsKey(decision.action()),
                 "Jev must only ever return an offered action, got " + decision.action());
         assertTrue(decision.confidence() >= 0 && decision.confidence() <= 1);
         assertTrue(decision.replanUrgency() >= 0 && decision.replanUrgency() <= 1);
         assertFalse(decision.probabilities().isEmpty(), "Expected a probability per option");
 
-        // With the goal met and a chest in reach, gathering more would be plainly wrong.
         assertNotEquals(AgentAction.GATHER, decision.action());
 
         System.out.printf("live Jev: %s confidence=%.2f replan=%.2f %s%n",

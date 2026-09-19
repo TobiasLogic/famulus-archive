@@ -2,16 +2,17 @@ package dev.famulus.core;
 
 import java.util.Objects;
 
-public final class GatherController {
-    public static final long PICKUP_GRACE_MILLIS = 1_000;
+public final class BuildController {
+    public static final long SETTLE_GRACE_MILLIS = 2_000;
 
-    private final GatherExecutor executor;
+    private final BuildExecutor executor;
     private final GatherConfig config;
-    private GatherTask task;
-    private TaskResult result = new TaskResult(TaskStatus.IDLE, "No task", 0, 0, 0);
+    private PlannedTask.Build task;
+    private TaskResult result = new TaskResult(TaskStatus.IDLE, "No build", 0, 0, 0);
     private String initialWorldKey;
-    private int currentCount;
-    private int highWaterCount;
+    private int remaining;
+    private int total;
+    private int bestRemaining;
     private int attempts;
     private long startedAt;
     private long attemptStartedAt;
@@ -22,21 +23,22 @@ public final class GatherController {
     private boolean observedInactive;
     private boolean ownsExecution;
 
-    public GatherController(GatherExecutor executor, GatherConfig config) {
+    public BuildController(BuildExecutor executor, GatherConfig config) {
         this.executor = Objects.requireNonNull(executor, "executor");
         this.config = Objects.requireNonNull(config, "config");
     }
 
-    public void start(GatherTask nextTask, WorldSnapshot snapshot, long nowMillis) {
+    public void start(PlannedTask.Build nextTask, BuildSnapshot snapshot, long nowMillis) {
         Objects.requireNonNull(nextTask, "task");
         Objects.requireNonNull(snapshot, "snapshot");
         if (isRunning() || ownsExecution) {
-            throw new IllegalStateException("Stop the current task and resolve cancellation before starting another");
+            throw new IllegalStateException("Stop the current build and resolve cancellation first");
         }
         task = nextTask;
         initialWorldKey = snapshot.worldKey();
-        currentCount = snapshot.itemCount();
-        highWaterCount = currentCount;
+        remaining = snapshot.remainingBlocks();
+        total = snapshot.totalBlocks();
+        bestRemaining = remaining;
         attempts = 0;
         startedAt = nowMillis;
         lastObservedAt = nowMillis;
@@ -45,44 +47,43 @@ public final class GatherController {
         if (!validateWorld(snapshot)) {
             return;
         }
-        if (currentCount >= task.targetCount()) {
-            finish(TaskStatus.SUCCESS, "Inventory target already satisfied");
-        } else if (!snapshot.inventoryHasSpace()) {
-            finish(TaskStatus.BLOCKED, "Inventory has no space for the requested item");
+        if (snapshot.totalBlocks() == 0) {
+            finish(TaskStatus.INVALID_TARGET, "The blueprint contains no placeable blocks");
+        } else if (snapshot.isComplete()) {
+            finish(TaskStatus.SUCCESS, "The structure already matches the blueprint");
+        } else if (!snapshot.hasMaterials()) {
+            finish(TaskStatus.RESOURCE_MISSING, "Missing materials for " + remaining + " blocks");
         } else {
             beginAttempt(nowMillis);
         }
     }
 
-    public void tick(WorldSnapshot snapshot, long nowMillis) {
+    public void tick(BuildSnapshot snapshot, long nowMillis) {
         if (!isRunning()) {
             return;
         }
         Objects.requireNonNull(snapshot, "snapshot");
-        currentCount = snapshot.itemCount();
+        remaining = snapshot.remainingBlocks();
+        total = snapshot.totalBlocks();
         if (nowMillis < lastObservedAt) {
-            finish(TaskStatus.FAILED, "Monotonic clock moved backwards; supply one monotonic time source");
+            finish(TaskStatus.FAILED, "Monotonic clock moved backwards; supply one monotonic source");
             return;
         }
         lastObservedAt = nowMillis;
         if (!validateWorld(snapshot)) {
             return;
         }
-
         if (elapsed(nowMillis, startedAt) >= config.taskTimeoutMillis()) {
-            finish(TaskStatus.TIMEOUT, "Task exceeded its total time budget");
+            finish(TaskStatus.TIMEOUT, "Build exceeded its total time budget with "
+                    + remaining + " blocks left");
             return;
         }
-        if (currentCount >= task.targetCount()) {
-            finish(TaskStatus.SUCCESS, "Inventory target reached");
+        if (snapshot.isComplete()) {
+            finish(TaskStatus.SUCCESS, "Structure matches the blueprint");
             return;
         }
-        if (!snapshot.inventoryHasSpace()) {
-            finish(TaskStatus.BLOCKED, "Inventory has no space for the requested item");
-            return;
-        }
-        if (currentCount > highWaterCount) {
-            highWaterCount = currentCount;
+        if (remaining < bestRemaining) {
+            bestRemaining = remaining;
             lastProgressAt = nowMillis;
         }
         if (result.status() == TaskStatus.RECOVERING) {
@@ -93,32 +94,35 @@ public final class GatherController {
             }
             return;
         }
-
         if (elapsed(nowMillis, Math.max(attemptStartedAt, lastProgressAt))
                 >= config.stallTimeoutMillis()) {
-            recover("No inventory progress within the stall timeout", nowMillis);
+            recover("No blocks placed within the stall timeout", nowMillis);
             return;
         }
         final boolean active;
         try {
             active = executor.isActive();
         } catch (RuntimeException failure) {
-            recover("Could not inspect executor: " + describe(failure), nowMillis);
+            recover("Could not inspect the builder: " + describe(failure), nowMillis);
             return;
         }
         if (active) {
             observedInactive = false;
-            publish(TaskStatus.RUNNING, "Gathering inventory items");
+            publish(TaskStatus.RUNNING, "Placing blocks");
             return;
         }
         if (!observedInactive) {
             observedInactive = true;
             inactiveSince = nowMillis;
         }
-        if (elapsed(nowMillis, inactiveSince) >= Math.min(PICKUP_GRACE_MILLIS, config.stallTimeoutMillis())) {
-            recover("Executor became inactive before inventory target was reached", nowMillis);
+        if (elapsed(nowMillis, inactiveSince) >= Math.min(SETTLE_GRACE_MILLIS, config.stallTimeoutMillis())) {
+            if (!snapshot.hasMaterials()) {
+                recover("Ran out of materials with " + remaining + " blocks left", nowMillis);
+            } else {
+                recover("Builder stopped with " + remaining + " blocks left", nowMillis);
+            }
         } else {
-            publish(TaskStatus.RUNNING, "Waiting briefly for mined item pickup");
+            publish(TaskStatus.RUNNING, "Waiting for the world to settle");
         }
     }
 
@@ -133,12 +137,6 @@ public final class GatherController {
         }
     }
 
-    public void fail(String reason) {
-        if (isRunning()) {
-            finish(TaskStatus.FAILED, reason == null || reason.isBlank() ? "Gather task failed" : reason);
-        }
-    }
-
     public TaskResult result() {
         return result;
     }
@@ -147,17 +145,17 @@ public final class GatherController {
         return result.status() == TaskStatus.RUNNING || result.status() == TaskStatus.RECOVERING;
     }
 
-    public GatherTask task() {
+    public PlannedTask.Build task() {
         return task;
     }
 
-    private boolean validateWorld(WorldSnapshot snapshot) {
+    private boolean validateWorld(BuildSnapshot snapshot) {
         if (!snapshot.connected()) {
             finish(TaskStatus.BLOCKED, "Disconnected from the world");
             return false;
         }
         if (!snapshot.alive()) {
-            finish(TaskStatus.FAILED, "Player is dead; gathering stopped");
+            finish(TaskStatus.FAILED, "Player is dead; building stopped");
             return false;
         }
         if (snapshot.worldKey() == null || snapshot.worldKey().isBlank()) {
@@ -175,13 +173,12 @@ public final class GatherController {
         attempts++;
         attemptStartedAt = nowMillis;
         observedInactive = false;
-        publish(TaskStatus.RUNNING, "Starting gather attempt " + attempts + " of " + config.maxAttempts());
-
+        publish(TaskStatus.RUNNING, "Starting build attempt " + attempts + " of " + config.maxAttempts());
         ownsExecution = true;
         try {
             executor.start(task);
         } catch (RuntimeException failure) {
-            recover("Executor could not start: " + describe(failure), nowMillis);
+            recover("Builder could not start: " + describe(failure), nowMillis);
         }
     }
 
@@ -220,7 +217,7 @@ public final class GatherController {
     }
 
     private void publish(TaskStatus status, String message) {
-        result = new TaskResult(status, message, currentCount, task == null ? 0 : task.targetCount(), attempts);
+        result = new TaskResult(status, message, total - remaining, total, attempts);
     }
 
     private static long elapsed(long nowMillis, long thenMillis) {

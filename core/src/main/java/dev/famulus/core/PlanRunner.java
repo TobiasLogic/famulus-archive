@@ -6,16 +6,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
-/**
- * Walks a {@link TaskPlan} one task at a time, deciding when the policy layer needs to be asked.
- *
- * <p>It never calls the policy itself. {@link #onTaskResult} returns {@link PlanStep#CONSULT_POLICY}
- * and the caller performs that call off-thread, handing the answer back through
- * {@link #onPolicyDecision}. That is what keeps this class free of I/O and threading, and therefore
- * testable without a game or a network.
- *
- * <p>Not thread safe. Drive it from one thread.
- */
 public final class PlanRunner {
     private final TaskPlan plan;
     private final int maxAttemptsPerTask;
@@ -33,8 +23,6 @@ public final class PlanRunner {
         }
         this.maxAttemptsPerTask = maxAttemptsPerTask;
         if (!plan.isExecutable()) {
-            // Refuse up front rather than running half the plan and stopping at the first task with
-            // no executor, which would leave the world in a partly changed state.
             throw new IllegalArgumentException("Plan contains tasks with no executor: "
                     + plan.unexecutable().stream().map(PlannedTask::describe).toList());
         }
@@ -56,18 +44,13 @@ public final class PlanRunner {
         return plan.tasks().get(index);
     }
 
-    /**
-     * Records the outcome of the current task.
-     *
-     * @return what the caller must do next
-     */
     public PlanStep onTaskResult(TaskResult result) {
         Objects.requireNonNull(result, "result");
         requireActive();
         completed.add(result);
         return switch (result.status()) {
             case SUCCESS -> advance("Finished " + describeCurrent());
-            // A user stop is an instruction, not a problem to reason about.
+
             case CANCELLED -> fail(PlanStep.PLAN_CANCELLED, "Cancelled during " + describeCurrent());
             default -> {
                 if (attempts >= maxAttemptsPerTask) {
@@ -80,7 +63,6 @@ public final class PlanRunner {
         };
     }
 
-    /** The choices to offer the policy layer while {@link PlanStep#CONSULT_POLICY} is pending. */
     public Map<AgentAction, String> policyOptions() {
         if (step != PlanStep.CONSULT_POLICY) {
             throw new IllegalStateException("No decision is pending");
@@ -97,7 +79,6 @@ public final class PlanRunner {
         return options;
     }
 
-    /** Applies the policy's answer. Any action that was not offered aborts, rather than being guessed at. */
     public PlanStep onPolicyDecision(AgentAction action) {
         Objects.requireNonNull(action, "action");
         if (step != PlanStep.CONSULT_POLICY) {
@@ -111,8 +92,6 @@ public final class PlanRunner {
                 yield step = PlanStep.RUN_CURRENT;
             }
             case EXPLORE -> {
-                // Exploring counts as an attempt. Otherwise a policy that keeps choosing it would
-                // wander forever without the plan ever giving up.
                 attempts++;
                 reason = "Exploring for " + describeCurrent() + ", attempt " + attempts
                         + " of " + maxAttemptsPerTask;
@@ -126,10 +105,6 @@ public final class PlanRunner {
         };
     }
 
-    /**
-     * Called when an exploration has finished, whether or not it found anything. The task is retried
-     * either way: the observed inventory, not the search, decides whether it succeeds.
-     */
     public PlanStep onExploreComplete(String summary) {
         if (step != PlanStep.EXPLORE) {
             throw new IllegalStateException("Not exploring, the plan is " + step);
@@ -177,7 +152,6 @@ public final class PlanRunner {
         return plan;
     }
 
-    /** Index of the task being worked on, 0-based, for progress display. */
     public int taskIndex() {
         return Math.min(index, plan.tasks().size() - 1);
     }
@@ -198,7 +172,6 @@ public final class PlanRunner {
         return List.copyOf(completed);
     }
 
-    /** One line for the status command and the screen. */
     public String progress() {
         return "[" + completedCount() + "/" + taskCount() + "] " + step + " - " + reason;
     }

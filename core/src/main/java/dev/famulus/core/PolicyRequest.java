@@ -5,13 +5,6 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
 
-/**
- * One decision point. {@code state} is plain text describing the world and the current plan;
- * {@code options} maps each permitted action to the description the policy is shown.
- *
- * <p>Cost is driven by state length, so keep it compact and structured rather than dumping raw
- * game data into it.
- */
 public record PolicyRequest(String state, Map<AgentAction, String> options) {
     public PolicyRequest {
         Objects.requireNonNull(state, "state");

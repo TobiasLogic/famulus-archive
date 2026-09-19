@@ -3,7 +3,6 @@ package dev.famulus.fabric;
 import java.util.Set;
 import java.util.TreeSet;
 
-/** Deliberate first-milestone scope: vanilla blocks whose item drops need no special tool. */
 public final class GatherCatalog {
     private static final Set<String> SUPPORTED = Set.of(
             "minecraft:oak_log", "minecraft:spruce_log", "minecraft:birch_log",

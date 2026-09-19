@@ -1,21 +1,13 @@
 package dev.famulus.core;
 
-/**
- * The complete set of actions the policy layer may choose from. A policy never invents an action:
- * a returned name that is not in this enum is rejected rather than interpreted.
- *
- * <p>Most of these have no executor yet. {@link #isExecutable()} is the authority on what can
- * actually be dispatched today, so an unimplemented choice fails loudly instead of silently
- * doing nothing.
- */
 public enum AgentAction {
     GATHER(true),
     MINE(false),
     CRAFT(false),
     TRAVEL(false),
-    /** Range outward looking for a resource that is not nearby. */
+
     EXPLORE(true),
-    BUILD(false),
+    BUILD(true),
     PLACE_BLOCK(false),
     INTERACT(false),
     DEPOSIT_ITEM(false),
@@ -33,12 +25,10 @@ public enum AgentAction {
         this.executable = executable;
     }
 
-    /** False while no executor exists for this action. */
     public boolean isExecutable() {
         return executable;
     }
 
-    /** Parse strictly. Returns null for anything unrecognised; callers must not guess. */
     public static AgentAction parse(String name) {
         if (name == null) {
             return null;

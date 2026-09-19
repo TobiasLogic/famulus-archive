@@ -7,16 +7,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
-/**
- * What a blueprint needs, diffed against what the player holds.
- *
- * <p>This is a deterministic computation over a parsed schematic and an inventory count. No model is
- * involved and none should be: asking a language model to add up block counts would be slower, more
- * expensive and less correct than doing it here.
- *
- * <p>Ordering is stable, largest shortfall first then by item id, so the same blueprint always
- * produces the same gather order and the same screen.
- */
 public record MaterialList(List<MaterialRequirement> requirements) {
     private static final Comparator<MaterialRequirement> BY_SHORTFALL =
             Comparator.comparingInt(MaterialRequirement::shortfall).reversed()
@@ -29,10 +19,6 @@ public record MaterialList(List<MaterialRequirement> requirements) {
         requirements = Collections.unmodifiableList(sorted);
     }
 
-    /**
-     * @param needed block counts from the blueprint; entries of zero or less are ignored
-     * @param have   inventory counts; missing items are treated as zero
-     */
     public static MaterialList of(Map<String, Integer> needed, Map<String, Integer> have) {
         Objects.requireNonNull(needed, "needed");
         Objects.requireNonNull(have, "have");
@@ -46,7 +32,6 @@ public record MaterialList(List<MaterialRequirement> requirements) {
         return new MaterialList(requirements);
     }
 
-    /** Only the items still short, in gather order. */
     public List<MaterialRequirement> shortfalls() {
         return requirements.stream().filter(requirement -> !requirement.satisfied()).toList();
     }
@@ -67,15 +52,10 @@ public record MaterialList(List<MaterialRequirement> requirements) {
         return requirements.stream().mapToInt(MaterialRequirement::shortfall).sum();
     }
 
-    /**
-     * Shortfalls this system can currently gather, in order. The rest need crafting, a specific tool
-     * or an entity interaction, so they are reported separately rather than attempted and failed.
-     */
     public List<MaterialRequirement> gatherable(java.util.function.Predicate<String> supported) {
         return shortfalls().stream().filter(r -> supported.test(r.itemId())).toList();
     }
 
-    /** Shortfalls with no gather path yet. A build cannot start while this is non-empty. */
     public List<MaterialRequirement> unobtainable(java.util.function.Predicate<String> supported) {
         return shortfalls().stream().filter(r -> !supported.test(r.itemId())).toList();
     }
