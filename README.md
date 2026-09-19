@@ -40,6 +40,23 @@ Famulus is a Fabric client mod for **Minecraft Java 26.2**. It uses
 
 Schematics go in `config/famulus/schematics/`.
 
+### Lunar Client
+
+Lunar Client runs Fabric mods through its Fabric add-on, so Famulus works there too. Pick a 26.2
+profile, open the launcher, press the button at the bottom right, choose Mods, and drag in both
+`famulus-fabric-26.2-0.1.0.jar` and the Baritone jar. Baritone is not bundled, so it has to go in
+alongside.
+
+If you would rather copy them in by hand, the folder is:
+
+```
+~/.lunarclient/profiles/<profile>/mods/fabric-26.2/
+```
+
+Lunar bundles Fabric API already. If it bundles more than one version, Fabric Loader will refuse to
+start with a duplicate mod error, so keep only the newest and rename the others to end in
+`.disabled`.
+
 ## Using it
 
 Press **G** in game for the panel, which has four tabs.
