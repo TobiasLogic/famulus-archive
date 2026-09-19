@@ -118,6 +118,8 @@ even when every assertion passes. See `BUGS.md`.
 - `docs/SCAFFOLDING.md` — what Baritone actually does when building off the ground, and the fix.
 - `docs/CONTAINERS.md` — the researched API for deposits and shulker overflow. Nothing implemented
   yet; read it before starting `DEPOSIT_ITEM`.
+- `docs/EXPLORING.md` — why `EXPLORE` exists, and the measured limit: it moves the player but has
+  not been shown to find a specific distant resource. Read before trusting it.
 - `docs/DEPENDENCIES.md` — why each version is pinned, with sources.
 
 ## API integration
@@ -318,3 +320,28 @@ without the Litematica mod. This had been an explicit open question.
 **Tests:** 110 offline tests. Client acceptance 17/17.
 
 **Next action:** the Chat tab and the LLM planner behind it.
+
+### 2026-09-19, sixth session
+
+**Attempted:** prove the policy layer fires in a live client, and act on the suggestion that the
+agent should explore when a resource is not nearby.
+
+**Completed:** the policy path is verified in game. With every log removed and 64 requested, the
+gather exhausted its attempts and Jev returned `REQUEST_REPLAN` at replan urgency 0.84. The
+classifier asserts it whenever a key is present. Added the `EXPLORE` action, `BaritoneExplorer` and
+four plan tests. Researched the container API for deposits and shulkers into `docs/CONTAINERS.md`.
+
+**Problems, and they matter:**
+
+- Baritone does not surrender when a resource is absent; only the stall timeout catches it. Recorded
+  in `BUGS.md`. This is the whole argument for exploring.
+- The explore probe returned a **negative** result and my first two versions of it were both wrong.
+  The first waited for exploring to become inactive, but exploring never finishes on its own. The
+  second measured distance from **spawn**, which looked like progress while the player wandered the
+  wrong way. Corrected to measure distance to the target. Read `docs/EXPLORING.md` before assuming
+  `EXPLORE` solves anything: it engages and moves the player, but has not been shown to make a
+  specific distant resource obtainable, and blind exploration is a random walk.
+
+**Tests:** 110 offline tests. Client acceptance 18/18 with a key, 17 without.
+
+**Next action:** `getToBlock` as a directed alternative to blind exploring, then the container layer.

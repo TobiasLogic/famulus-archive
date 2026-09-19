@@ -25,9 +25,9 @@ public final class ExploreProbeGameTest implements FabricClientGameTest {
     private static final int GROUND_Y = -61;
     /** Far enough to be outside the loaded area at spawn, near enough to reach in a few minutes. */
     private static final int SAND_DISTANCE = 260;
-    private static final int CONTROL_TICKS = 900;
-    private static final int EXPLORE_TICKS = 3600;
-    private static final int GATHER_TICKS = 4800;
+    private static final int CONTROL_TICKS = 600;
+    private static final int EXPLORE_TICKS = 1200;
+    private static final int GATHER_TICKS = 1200;
 
     @Override
     public void runTest(ClientGameTestContext context) {
@@ -65,9 +65,24 @@ public final class ExploreProbeGameTest implements FabricClientGameTest {
             // Treatment: explore, then try again.
             // Exploring never finishes on its own; it runs until stopped. Bound it by time, which
             // is exactly what FamulusAgent does with exploreTimeoutMillis.
+            //
+            // Distance travelled is recorded because without it a zero result cannot be read: it
+            // would not say whether exploring never engaged, or engaged and was simply too slow.
             context.runOnClient(client -> EXPLORER.start(client));
-            context.waitTicks(EXPLORE_TICKS);
+            context.waitTicks(20);
+            boolean engaged = context.computeOnClient(client -> EXPLORER.isActive());
+            System.out.println("[FamulusExplore] explore process active after 1s: " + engaged);
+            double travelled = 0;
+            for (int elapsed = 0; elapsed < EXPLORE_TICKS; elapsed += 100) {
+                context.waitTicks(100);
+                travelled = context.computeOnClient(ExploreProbeGameTest::distanceToSand);
+                System.out.println("[FamulusExplore] after " + (elapsed + 100) / 20 + "s: "
+                        + Math.round(travelled) + " blocks from the sand, active="
+                        + context.computeOnClient(client -> EXPLORER.isActive()));
+            }
             context.runOnClient(client -> EXPLORER.cancel());
+            System.out.println("[FamulusExplore] closed to " + Math.round(travelled)
+                    + " blocks from the sand");
             context.waitTick();
             context.takeScreenshot("famulus-explore-after-exploring");
 
@@ -91,6 +106,19 @@ public final class ExploreProbeGameTest implements FabricClientGameTest {
             context.waitTick();
         }
         return context.computeOnClient(ExploreProbeGameTest::sandCount);
+    }
+
+    /**
+     * Distance to the sand, not to spawn. Distance from spawn says only that the player went
+     * somewhere, and exploring is undirected, so somewhere is usually the wrong way.
+     */
+    private static double distanceToSand(Minecraft client) {
+        if (client.player == null) {
+            return Double.MAX_VALUE;
+        }
+        double dx = client.player.getX() - (SAND_DISTANCE + 7.5);
+        double dz = client.player.getZ() - (SAND_DISTANCE + 7.5);
+        return Math.sqrt(dx * dx + dz * dz);
     }
 
     private static int sandCount(Minecraft client) {

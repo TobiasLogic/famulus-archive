@@ -10,6 +10,9 @@
   Exploring counts as an attempt, so it cannot wander forever.
 - Measured that Baritone keeps its mine process active when a block type is absent; only the stall
   timeout catches it. See `BUGS.md`.
+- Measured what exploring actually achieves, and it is less than hoped: it engages and moves the
+  player hundreds of blocks, but did not make a patch of sand 368 blocks away obtainable. Blind
+  exploration is undirected. `docs/EXPLORING.md` records the result and the better options.
 - **In-game control panel**, opened with **G**. Agent, Build and Settings tabs, built on vanilla's
   `MenuTabBar`. All three are photographed by the client test, because a compile proves nothing
   about a GUI.
